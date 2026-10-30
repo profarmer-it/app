@@ -14,7 +14,7 @@
    ========================================================================== */
 
 const Documenti = (() => {
-  const VERSIONE = 'nomina-2026-11-v3';   // v3 (30/10): il dipendente timbra dal suo account, niente telefono collegato
+  const VERSIONE = 'nomina-2026-11-v4';   // v4 (30/10): Cloudflare Turnstile fra i sub-responsabili; v3: il dipendente timbra dal suo account
   const CONDIZIONI = 'condizioni-easy-2026-11-v1';
   const PF = 'Pro Farmer S.r.l.s., Via Milazzo 19, 26100 Cremona (CR), P.IVA 01797050190, info@profarmer.it';
   const e = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -23,6 +23,7 @@ const Documenti = (() => {
   const SUB = [
     ['Supabase Inc.', 'database, accesso e funzioni dell’app; i dati stanno nella regione europea (Francoforte, Germania)'],
     ['Resend Inc.', 'invio delle e-mail di accesso e di servizio'],
+    ['Cloudflare Inc. (Turnstile)', 'controllo anti-robot quando si entra nell’app; vede i dati tecnici del browser, non i dati delle presenze'],
     ['GitHub Inc. (GitHub Pages)', 'pubblicazione delle pagine dell’app; non riceve i dati delle presenze'],
     ['Servizi di notifica dei telefoni (Apple, Google, Mozilla)', 'consegna delle notifiche a chi le ha attivate; ricevono solo il testo della notifica']
   ];

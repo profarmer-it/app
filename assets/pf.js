@@ -133,9 +133,10 @@ const PF = (() => {
       const pw = document.getElementById('password').value;
       if (!pw) return mostraAccesso('Scrivi la password. Se non l’hai ancora scelta, tocca «Primo accesso».');
       const b = ev.currentTarget.querySelector('.btn'); b.disabled = true; b.textContent = 'Controllo…';
-      collegamento().auth.signInWithPassword({ email: e, password: pw }).then(({ error }) => {
+      Antirobot.token().then(captchaToken => collegamento().auth.signInWithPassword({ email: e, password: pw, options: { captchaToken } })).then(({ error }) => {
         if (!error) return carica();
         const m = String(error.message || '');
+        if (Antirobot.errore(error)) return mostraAccesso('Il controllo anti-robot non è riuscito: ricarica la pagina e riprova.');
         if (error.status === 429 || /rate|too many/i.test(m)) return mostraAccesso('Troppi tentativi: aspetta qualche minuto e riprova.');
         if (/invalid|credentials/i.test(m)) return mostraAccesso('E-mail o password sbagliate. Se è il primo accesso o non ricordi la password, ricevi un codice per e-mail.');
         mostraAccesso(navigator.onLine === false ? 'Sei senza rete: riprova quando torna il segnale.' : 'Non riesco a controllare: riprova tra poco.');
@@ -170,9 +171,10 @@ const PF = (() => {
   function chiediCodice(e, el, crea) {
     if (el) { el.style.pointerEvents = 'none'; el.textContent = 'Mando il codice…'; }
     const torna = crea ? mostraCrea : mostraAccesso;
-    collegamento().auth.signInWithOtp({ email: e, options: { shouldCreateUser: !!crea, data: crea ? { app: 'pf' } : undefined } }).then(({ error }) => {
+    Antirobot.token().then(captchaToken => collegamento().auth.signInWithOtp({ email: e, options: { shouldCreateUser: !!crea, data: crea ? { app: 'pf' } : undefined, captchaToken } })).then(({ error }) => {
       if (!error) return mostraCodice();
       const m = String(error.message || '');
+      if (Antirobot.errore(error)) return torna('Il controllo anti-robot non è riuscito: ricarica la pagina e riprova.');
       if (error.status === 429 || /rate|seconds|too many/i.test(m)) return torna('Hai chiesto il codice da poco: aspetta un minuto e riprova.');
       if (/signup|not allowed|not found|user/i.test(m)) return crea
         ? torna('Le registrazioni non sono ancora aperte: scrivi a info@profarmer.it.')
