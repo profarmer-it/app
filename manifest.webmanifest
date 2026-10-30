@@ -1,0 +1,25 @@
+{
+  "name": "Pro Farmer",
+  "short_name": "Pro Farmer",
+  "description": "L’app Pro Farmer per l’allevatore: Riposa per piùLact e Presenze e turni per i dipendenti della stalla.",
+  "lang": "it",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#242320",
+  "theme_color": "#242320",
+  "icons": [
+    { "src": "assets/icone/icona-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icone/icona-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icone/icona-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Timbra", "url": "/#timbra", "icons": [{ "src": "assets/icone/icona-192.png", "sizes": "192x192" }] },
+    { "name": "Oggi in stalla", "url": "/#oggi", "icons": [{ "src": "assets/icone/icona-192.png", "sizes": "192x192" }] }
+  ],
+  "categories": ["business", "productivity"],
+  "prefer_related_applications": false,
+  "dir": "ltr"
+}

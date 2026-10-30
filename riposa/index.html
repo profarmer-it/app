@@ -1,0 +1,293 @@
+<!-- GENERATO da «App Pro Farmer/strumenti/genera-riposa.mjs» a partire da Riposa/index.html: non modificare qui. -->
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Riposa — il dosaggio giusto di piùLact per la tua stalla</title>
+<meta name="description" content="Calcola in due minuti quale prodotto della gamma piùLact serve alla tua stalla, quanto ne serve e come si usa. Uno strumento Pro Farmer.">
+<link rel="stylesheet" href="assets/style.css?v=20261030a">
+<!-- App installabile (anche su iPhone: Condividi → Aggiungi alla schermata Home) -->
+<link rel="icon" type="image/png" sizes="32x32" href="../assets/icone/favicon-32.png">
+<link rel="apple-touch-icon" href="../assets/icone/apple-touch-icon.png">
+<meta name="theme-color" content="#242320">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pro Farmer">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<script data-solo-allevatore>
+  /* Dal 24/10/2026 i venditori hanno la loro app, Riposa Pro, su /pro/.
+     Ci mandiamo i vecchi link (#venditori) e chi ha installato la Riposa di
+     prima ed era già entrato nella sua area. */
+  (function () {
+    var venditore = false;
+    try {
+      venditore = !!localStorage.getItem('sb-gmhmxybqmkcmnbjdnslz-auth-token')
+        && (matchMedia('(display-mode: standalone)').matches || navigator.standalone === true);
+    } catch (e) {}
+    if (location.hash === '#venditori' || venditore) { location.replace('https://riposa.profarmer.it/pro/'); return; }
+    /* L'apertura animata (24/10/2026): nell'app installata a ogni apertura,
+       nel browser una volta per visita. Mai a chi ha chiesto meno movimento. */
+    try {
+      if (/[?&]apertura=(prova|ferma)/.test(location.search)) sessionStorage.removeItem('riposa-apertura');
+      var app = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+      var vista = sessionStorage.getItem('riposa-apertura') === '1';
+      if (!matchMedia('(prefers-reduced-motion: reduce)').matches && (app || !vista)) {
+        document.documentElement.classList.add('con-apertura');
+        sessionStorage.setItem('riposa-apertura', '1');
+      }
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+<a href="../" style="display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px;background:#242320;color:#fff;font:700 15px/1.2 Inter,system-ui,sans-serif;text-decoration:none">
+  <span aria-hidden="true" style="font-size:18px">←</span> Pro Farmer</a>
+
+<!-- APERTURA: l'animazione d'ingresso, solo per l'allevatore (genera-pro.mjs la toglie).
+     Si vede solo con la classe con-apertura su <html>, decisa dallo script in testa. -->
+<div class="apertura" id="apertura" aria-hidden="true">
+  <svg class="apertura-segno" viewBox="0 0 200 200" aria-hidden="true">
+    <defs><linearGradient id="ap-croce" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3FC4F2"/><stop offset="1" stop-color="#4A7DF7"/></linearGradient>
+      <linearGradient id="ap-riflesso" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+      <clipPath id="ap-sagoma"><rect x="73" y="16" width="54" height="168" rx="9"/><rect x="16" y="73" width="168" height="54" rx="9"/></clipPath></defs>
+    <circle class="ap-alone" cx="100" cy="100" r="70"/>
+    <rect class="ap-v" x="73" y="16" width="54" height="168" rx="9" fill="url(#ap-croce)"/>
+    <rect class="ap-h" x="16" y="73" width="168" height="54" rx="9" fill="url(#ap-croce)"/>
+    <!-- un riflesso di luce che attraversa la croce appena formata -->
+    <g clip-path="url(#ap-sagoma)"><rect class="ap-riflesso" x="-60" y="0" width="60" height="200" fill="url(#ap-riflesso)" transform="skewX(-18)"/></g>
+    <g transform="translate(54 54)"><g class="ap-bovina">
+      <ellipse cx="19" cy="34" rx="7.5" ry="12" transform="rotate(-34 19 34)" fill="#D7E3F0"/>
+      <ellipse cx="73" cy="34" rx="7.5" ry="12" transform="rotate(34 73 34)" fill="#D7E3F0"/>
+      <path d="M28 22c-3-4-2-8 1-10 1 3 2 6 4 8z" fill="#B9C9DA"/>
+      <path d="M64 22c3-4 2-8-1-10-1 3-2 6-4 8z" fill="#B9C9DA"/>
+      <ellipse cx="46" cy="48" rx="26" ry="24" fill="#fff"/>
+      <path d="M46 24c-9 0-16 4-19 10 5 2 11 1 15-2 3 3 8 4 12 3-1-6-4-10-8-11z" fill="#2F86E0"/>
+      <ellipse cx="46" cy="68" rx="17.5" ry="12" fill="#8CC4F5"/>
+      <circle cx="39.5" cy="67" r="2.4" fill="#0E2340"/><circle cx="52.5" cy="67" r="2.4" fill="#0E2340"/>
+      <circle class="ap-occhio" cx="36" cy="44" r="3.6" fill="#0E2340"/><circle class="ap-occhio" cx="56" cy="44" r="3.6" fill="#0E2340"/>
+      <circle cx="37.2" cy="42.8" r="1.2" fill="#fff"/><circle cx="57.2" cy="42.8" r="1.2" fill="#fff"/>
+    </g></g>
+    <circle class="ap-bolla ap-b1" cx="146" cy="62" r="4.5"/>
+    <circle class="ap-bolla ap-b2" cx="161" cy="46" r="6.5"/>
+    <circle class="ap-bolla ap-b3" cx="179" cy="26" r="9"/>
+  </svg>
+  <p class="apertura-nome">Riposa</p>
+  <p class="apertura-sotto">il dosaggio giusto di piùLact</p>
+</div>
+<script>
+  /* Dopo 3,9 secondi (o al primo tocco) l'apertura si dissolve e la pagina entra.
+     Riposa Pro (stesso script, copiato da genera-pro.mjs) resta a 1,9 secondi. */
+  (function () {
+    var el = document.getElementById('apertura'), via = false;
+    if (!document.documentElement.classList.contains('con-apertura')) { el.remove(); return; }
+    function chiudi() {
+      if (via) return; via = true;
+      el.classList.add('apertura-via');
+      document.documentElement.classList.add('apertura-finita');
+      setTimeout(function () { el.remove(); document.documentElement.classList.remove('con-apertura'); }, 450);
+    }
+    el.addEventListener('pointerdown', chiudi);
+    if (/[?&]apertura=ferma/.test(location.search)) return;   // solo per i fotogrammi di collaudo: resta finché non si tocca
+    setTimeout(chiudi, el.classList.contains('apertura-pro') ? 1900 : 3900);
+  })();
+</script>
+<!-- /APERTURA -->
+
+<header class="testata">
+  <div class="contenitore testata-in">
+    <img class="logo-profarmer" src="assets/logo-profarmer.png" alt="Pro Farmer" width="532" height="200">
+  </div>
+</header>
+
+<section class="eroe">
+  <div class="contenitore eroe-in">
+    <div class="eroe-parole">
+      <h1>Quanto piùLact serve alla tua stalla?</h1>
+      <p class="eroe-testo">Rispondi a poche domande. Ti diciamo quale prodotto usare, come e in che dose, e quanto ordinarne per spendere meno di trasporto.</p>
+    </div>
+    <!-- la stessa bovina che poi "ragiona" sul calcolo (app.js), qui ferma -->
+    <svg class="bovina bovina-eroe" viewBox="0 0 124 104" aria-hidden="true">
+      <circle class="pensiero p1" cx="88" cy="36" r="4"/>
+      <circle class="pensiero p2" cx="100" cy="25" r="5.5"/>
+      <circle class="pensiero p3" cx="114" cy="12" r="7.5"/>
+      <ellipse class="orecchio" cx="19" cy="34" rx="7.5" ry="12" transform="rotate(-34 19 34)"/>
+      <ellipse class="orecchio" cx="73" cy="34" rx="7.5" ry="12" transform="rotate(34 73 34)"/>
+      <path class="corno" d="M28 22c-3-4-2-8 1-10 1 3 2 6 4 8z"/>
+      <path class="corno" d="M64 22c3-4 2-8-1-10-1 3-2 6-4 8z"/>
+      <ellipse class="cranio" cx="46" cy="48" rx="26" ry="24"/>
+      <path class="macchia" d="M46 24c-9 0-16 4-19 10 5 2 11 1 15-2 3 3 8 4 12 3-1-6-4-10-8-11z"/>
+      <ellipse class="muso" cx="46" cy="68" rx="17.5" ry="12"/>
+      <circle class="narice" cx="39.5" cy="67" r="2.4"/>
+      <circle class="narice" cx="52.5" cy="67" r="2.4"/>
+      <circle class="occhio" cx="36" cy="44" r="3.6"/>
+      <circle class="occhio" cx="56" cy="44" r="3.6"/>
+      <circle class="luce" cx="37.2" cy="42.8" r="1.2"/>
+      <circle class="luce" cx="57.2" cy="42.8" r="1.2"/>
+    </svg>
+  </div>
+</section>
+
+<main class="contenitore">
+
+  <form id="modulo" class="scheda" novalidate>
+
+    <h2 class="titolo-sezione"><span class="numero">1</span> La tua zona di riposo</h2>
+
+    <fieldset class="campo">
+      <legend>Dove riposano le tue vacche?</legend>
+      <div class="scelte">
+        <label class="scelta">
+          <input type="radio" name="zona" value="materassino" required>
+          <span class="scelta-corpo">
+            <strong>Cuccette a materassino</strong>
+            <small>materassino o tappetino</small>
+          </span>
+        </label>
+        <label class="scelta">
+          <input type="radio" name="zona" value="buca">
+          <span class="scelta-corpo">
+            <strong>Cuccette a buca / riempimento</strong>
+            <small>che sia con blister (nido d’ape) o senza</small>
+          </span>
+        </label>
+        <label class="scelta">
+          <input type="radio" name="zona" value="lettiera">
+          <span class="scelta-corpo">
+            <strong>Lettiera</strong>
+            <small>lettiera in paglia o simili a rinnovo frequente</small>
+          </span>
+        </label>
+        <label class="scelta">
+          <input type="radio" name="zona" value="compost">
+          <span class="scelta-corpo">
+            <strong>Compost barn</strong>
+            <small>rinnovata di rado, si pulisce dopo diversi mesi; si aggiunge materiale e si lavora col coltivatore, a volte ogni giorno</small>
+          </span>
+        </label>
+      </div>
+    </fieldset>
+
+    <div class="griglia-2" id="blocco-cuccette">
+      <div class="campo">
+        <label for="cuccette">Numero di cuccette</label>
+        <input type="number" id="cuccette" name="cuccette" min="1" max="5000" step="1" placeholder="es. 120" inputmode="numeric">
+        <p class="aiuto">Se non lo sai con precisione, indica i capi in mungitura qui accanto.</p>
+      </div>
+      <div class="campo">
+        <label for="capi">Capi in mungitura</label>
+        <input type="number" id="capi" name="capi" min="1" max="5000" step="1" placeholder="es. 115" inputmode="numeric">
+        <p class="aiuto">Se non indichi le cuccette le stimiamo da qui, arrotondando per eccesso: contiamo anche gli spazi delle asciutte e il prodotto che userai in sala parto, infermeria e gabbiette.</p>
+      </div>
+    </div>
+
+    <fieldset class="campo">
+      <legend>Come mungi?</legend>
+      <div class="scelte scelte-fila">
+        <label class="scelta scelta-piccola">
+          <input type="radio" name="mungitura" value="sala" required>
+          <span class="scelta-corpo"><strong>Sala di mungitura</strong></span>
+        </label>
+        <label class="scelta scelta-piccola">
+          <input type="radio" name="mungitura" value="robot">
+          <span class="scelta-corpo"><strong>Robot di mungitura</strong></span>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset class="campo" id="blocco-riempimento" hidden>
+      <legend>Come riempi la buca?</legend>
+      <div class="scelte">
+        <label class="scelta">
+          <input type="radio" name="riempimento" value="miscelata">
+          <span class="scelta-corpo">
+            <strong>Con una miscelata</strong>
+            <small>paglia macinata, acqua e igienizzante, distribuiti con il carro unifeed, il lanciapaglia o simili</small>
+          </span>
+        </label>
+        <label class="scelta">
+          <input type="radio" name="riempimento" value="spaglio">
+          <span class="scelta-corpo">
+            <strong>Con il materiale, e il prodotto a spaglio sopra</strong>
+            <small>paglia lunga, separato o digestato, con piùLact distribuito a spaglio</small>
+          </span>
+        </label>
+      </div>
+    </fieldset>
+
+    <div class="griglia-2" id="blocco-superficie" hidden>
+      <div class="campo">
+        <label for="mq">Metri quadri di lettiera</label>
+        <input type="number" id="mq" name="mq" min="1" max="50000" step="1" placeholder="es. 900" inputmode="numeric">
+        <p class="aiuto">La superficie totale della zona a lettiera.</p>
+      </div>
+      <div class="campo">
+        <label for="capiZona">Capi presenti in quella zona</label>
+        <input type="number" id="capiZona" name="capiZona" min="1" max="5000" step="1" placeholder="es. 80" inputmode="numeric">
+        <p class="aiuto">Serve per i metri quadri a capo: sopra i 9 m² si interviene meno spesso.</p>
+      </div>
+    </div>
+
+    <fieldset class="campo">
+      <legend id="titolo-lettiera-attuale">Cosa usi oggi in cuccetta? <span class="opzionale">puoi indicarne più di uno</span></legend>
+      <div class="spunte">
+        <label class="spunta"><input type="checkbox" name="lettieraAttuale" value="Paglia macinata"><span>Paglia macinata</span></label>
+        <label class="spunta"><input type="checkbox" name="lettieraAttuale" value="Paglia lunga"><span>Paglia lunga</span></label>
+        <label class="spunta"><input type="checkbox" name="lettieraAttuale" value="Paglia pellettata"><span>Paglia pellettata</span></label>
+        <label class="spunta"><input type="checkbox" name="lettieraAttuale" value="Segatura"><span>Segatura</span></label>
+        <label class="spunta"><input type="checkbox" name="lettieraAttuale" value="Separato"><span>Separato</span></label>
+        <label class="spunta"><input type="checkbox" name="lettieraAttuale" value="Digestato"><span>Digestato</span></label>
+        <label class="spunta"><input type="checkbox" name="lettieraAttuale" value="Calce Idrata"><span>Calce Idrata</span></label>
+        <label class="spunta"><input type="checkbox" name="lettieraAttuale" value="Carbonato di Calcio"><span>Carbonato di Calcio</span></label>
+        <label class="spunta"><input type="checkbox" name="lettieraAttuale" value="Altro Igienizzante"><span>Altro Igienizzante</span></label>
+        <label class="spunta"><input type="checkbox" name="lettieraAttuale" value="Niente" data-esclusiva="si"><span>Niente</span></label>
+      </div>
+    </fieldset>
+
+    <div class="griglia-2">
+      <div class="campo">
+        <label for="cellule">Cellule somatiche medie <span class="opzionale">facoltativo</span></label>
+        <input type="number" id="cellule" name="cellule" min="0" max="3000" step="1" placeholder="es. 240" inputmode="numeric">
+        <p class="aiuto">In migliaia per ml, come le leggi sull'analisi del latte.</p>
+      </div>
+    </div>
+
+    <p id="errore" class="errore" hidden></p>
+
+    <button type="submit" class="bottone bottone-grande">Calcola il dosaggio</button>
+    <p class="aiuto aiuto-centro">Il calcolo avviene sul tuo telefono. Dopo ti chiediamo i contatti: ti mandiamo il risultato per e-mail e Pro Farmer o il suo agente di zona ti ricontatta.</p>
+  </form>
+
+  <section id="risultato" hidden></section>
+
+</main>
+
+<footer class="pedana">
+  <div class="contenitore pedana-in">
+    <img class="logo-piulact" src="assets/logo-piulact.png" alt="piùLact" width="300" height="300">
+    <p class="pedana-firma">un prodotto Pro Farmer</p>
+    <p class="pedana-nota">
+      I valori calcolati sono indicativi e vanno adattati alla singola stalla.
+      Per una valutazione precisa, o per qualsiasi altra informazione, chiama
+      Pro Farmer.
+    </p>
+    <a class="chiama" href="tel:+393761296162"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>Chiama Pro Farmer · +39 376 129 6162</a>
+    <p class="pedana-nota pedana-altra-app"><a href="https://riposa.profarmer.it/pro/">Sei un agente o un rivenditore? Entra in Riposa Pro</a></p>
+  </div>
+</footer>
+
+<script src="../assets/vendor/supabase-2.45.4.js"></script>
+<script>try { localStorage.setItem('riposa-installa-allevatore-no', '1'); } catch (e) {}</script>
+<script src="assets/regole.js?v=20261030a"></script>
+<script src="assets/app.js?v=20261030a"></script>
+<script src="assets/allevatore.js?v=20261030a"></script>
+<!-- RIPOSA PRO: qui strumenti/genera-pro.mjs aggiunge gli script dei venditori -->
+<script>
+  /* L'app installabile: il service worker tiene la pagina sul telefono, così
+     si apre in fretta e il calcolo funziona anche senza rete. Vedi sw.js. */
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('../sw.js').catch(() => {}); });
+  }
+</script>
+</body>
+</html>
