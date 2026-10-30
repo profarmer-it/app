@@ -105,6 +105,7 @@ const PF = (() => {
         <label for="password" style="margin-top:8px">La password</label>
         <div class="campo-pw"><input id="password" name="password" type="password" autocomplete="current-password" enterkeyhint="go">
           <button type="button" class="mostra-pw" aria-label="Mostra la password" aria-pressed="false">Mostra</button></div>
+        <div class="antirobot" data-antirobot aria-live="polite"></div>
         <button class="btn pieno" style="margin-top:8px">Entra</button>
       </form>
       ${msg ? `<p class="errore" role="alert">${esc(msg)}</p>` : ''}
@@ -154,6 +155,7 @@ const PF = (() => {
       <form id="f-crea" class="campo" novalidate>
         <label for="c-email">La tua e-mail</label>
         <input id="c-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" value="${esc(emailAccesso)}">
+        <div class="antirobot" data-antirobot aria-live="polite"></div>
         <button class="btn pieno" style="margin-top:8px">Mandami il codice</button>
       </form>
       ${msg ? `<p class="errore" role="alert">${esc(msg)}</p>` : ''}
