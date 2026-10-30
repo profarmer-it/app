@@ -105,7 +105,8 @@ const PFDemo = (() => {
     }
     return {
       azienda: { id: AZ, ragione: 'Cascina Demo', comune: 'Soresina', pausa_dopo_ore: 6, pausa_minuti: 0, ritardo_minuti: 15,
-        soglia_straordinari_mese: 30, posizione_attiva: false, cliente_piulact: true },
+        soglia_straordinari_mese: 30, posizione_attiva: false, cliente_piulact: true,
+        nomina: { versione: 'nomina-2026-11-v1', il: new Date(Date.now() - 20 * 864e5).toISOString(), da: 'Marco Rossi' } },
       piano: { piano: 'regalo', stato: 'attivo', fino_al: null },
       persone, turni, mansioni, timbrature, assenze: ass,
       punti: [{ id: 'q-sala', nome: 'Sala mungitura', codice: 'demo-sala-mungitura', lat: null, lon: null, raggio_m: 300, attivo: true },
@@ -282,6 +283,7 @@ const PFDemo = (() => {
       if (p.pin !== p_pin) return { ok: false, motivo: 'PIN sbagliato.' };
       return scrivi(p.id, p_verso, 'chiosco', p_ora_telefono, p_chiave_invio);
     },
+    pf_accetta_nomina() { titolare(); d.azienda.nomina = { versione: 'nomina-2026-11-v1', il: new Date().toISOString(), da: me().nome }; salva(); return { ok: true }; },
     pf_salva_iscrizione() { return { ok: true }; },
     pf_togli_iscrizione() { return { ok: true }; }
   };

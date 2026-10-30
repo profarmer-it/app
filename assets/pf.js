@@ -228,6 +228,7 @@ const PF = (() => {
         <button class="btn sec" data-az="esci">Esci</button></div>`;
       return;
     }
+    if (!A.azienda.nomina) { vNomina(); return; }
     app().innerHTML = barraDemo()
       + (titolo ? `<header class="testa"><h1>${titolo}</h1>${v === 'oggi' ? '' : ''}</header>`
         : `<header class="testa"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer"></header>`)
@@ -698,6 +699,15 @@ const PF = (() => {
         <div class="riga"><span>Avviso straordinari</span><span class="dx">oltre ${A.azienda.soglia_straordinari_mese} ore al mese</span></div>
         <div class="riga"><span>Posizione al momento della timbratura</span><span class="dx">${A.azienda.posizione_attiva ? 'accesa' : 'spenta'}</span></div>
         <button class="btn sec pieno" style="margin-top:10px" data-az="regole">Cambia le regole</button></div>
+      <h2 class="sezione">Documenti</h2>
+      <div class="scheda">
+        <div class="riga"><span>Nomina di Pro Farmer a responsabile del trattamento</span><span class="dx">${A.azienda.nomina
+          ? `accettata il ${dataIt(Conti.roma(A.azienda.nomina.il).giorno)}` : ''}</span></div>
+        <div class="riga-bottoni" style="margin:8px 0 12px"><button class="btn sec piccolo" data-az="doc-nomina">Leggi o stampa</button></div>
+        <div class="riga"><span>Informativa per i dipendenti, già compilata con i dati dell'azienda</span><span class="dx"></span></div>
+        <p class="sotto" style="margin:6px 0 8px">Stampala, aggiungi il contatto di riferimento e falla firmare per presa visione. Va data prima di cominciare a timbrare.</p>
+        <div class="riga-bottoni"><button class="btn sec piccolo" data-az="doc-informativa">Leggi o stampa</button></div>
+      </div>
       ${vProfilo()}`;
   }
   function foglioPersona(p) {
@@ -807,6 +817,43 @@ const PF = (() => {
         persone: [...f.querySelectorAll('input[type=checkbox]:checked')].map(x => x.value) } }, 'Salvato.', f));
       const t = f.querySelector('#m-togli'); if (t) t.addEventListener('click', () => salvaE('pf_salva_mansione', { p: { id: m.id, togli: true } }, 'Tolto.', f));
     });
+  }
+
+  /* -------------------------------------- la nomina e i documenti (30/10/2026) */
+  function vNomina() {
+    app().className = '';
+    if (!titolare()) {
+      app().innerHTML = barraDemo() + `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
+        <h1>Quasi pronta</h1><p class="sotto">Il titolare di ${esc(A.azienda.ragione)} deve ancora completare l'attivazione di Presenze e turni.
+        Appena l'ha fatto, riapri l'app.</p><button class="btn sec" data-az="esci">Esci</button></div>`;
+      return;
+    }
+    app().innerHTML = barraDemo() + `<header class="testa"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer"></header>
+      <main class="corpo" style="padding-bottom:32px">
+        <p class="saluto">Prima di cominciare</p>
+        <p class="sotto">${esc(A.azienda.ragione)} è il titolare dei dati dei suoi dipendenti; Pro Farmer li tratta per suo conto,
+          come responsabile del trattamento. Per questo serve la nomina (art. 28 GDPR). In breve:</p>
+        <div class="scheda"><ul class="punti">
+          <li>Pro Farmer usa i dati <b>solo per far funzionare l'app</b>, mai per altri scopi.</li>
+          <li><b>Pro Farmer non guarda le presenze</b> dei tuoi dipendenti, se non quando gli chiedi assistenza.</li>
+          <li>Niente dati biometrici, niente posizione in continuo; i dati stanno in Unione europea.</li>
+          <li>A te tocca dare l'informativa ai dipendenti: il modello pronto è in Impostazioni → Documenti.</li>
+          <li>Puoi esportare tutto quando vuoi; alla fine del servizio hai 30 giorni per scaricare i dati.</li>
+        </ul></div>
+        <button class="btn chiaro" data-az="doc-nomina">Leggi tutto il testo</button>
+        <label class="spunta"><input type="checkbox" id="nomina-ok"> <span>Ho letto la nomina e la accetto per ${esc(A.azienda.ragione)}.</span></label>
+        <p class="errore" id="nomina-err"></p>
+        <button class="btn pieno" data-az="accetta-nomina">Accetto e comincio</button>
+        <button class="btn sec" data-az="esci">Esci</button>
+      </main>`;
+  }
+  function documento(html, titolo) {
+    foglio(titolo, `<div class="doc">${html}</div><button class="btn sec pieno" data-az="stampa-doc">Stampa o salva in PDF</button>`);
+    documento.ultimo = html;
+  }
+  function stampaDoc(html) {
+    document.getElementById('stampa').innerHTML = `<div class="doc doc-stampa">${html}</div>`;
+    setTimeout(() => window.print(), 60);
   }
 
   /* ------------------------------------------------------ compiti, profilo */
@@ -1010,6 +1057,17 @@ const PF = (() => {
   /* --------------------------------------------------------- i tocchi */
   const AZ = {
     esci, notifiche: attivaNotifiche, inquadra,
+    'doc-nomina': () => documento(Documenti.nomina(A.azienda), 'La nomina'),
+    'doc-informativa': () => documento(Documenti.informativa(A.azienda), 'Informativa per i dipendenti'),
+    'stampa-doc': () => stampaDoc(documento.ultimo || ''),
+    'accetta-nomina': b => {
+      const ok = document.getElementById('nomina-ok');
+      if (!ok || !ok.checked) { document.getElementById('nomina-err').textContent = 'Spunta la casella per accettare.'; return; }
+      b.disabled = true; b.textContent = 'Un attimo…';
+      rpc('pf_accetta_nomina', { p_versione: Documenti.VERSIONE })
+        .then(() => aggiorna('Fatto. Adesso aggiungi le persone e stampa il QR.'))
+        .catch(e => { b.disabled = false; b.textContent = 'Accetto e comincio'; document.getElementById('nomina-err').textContent = motivo(e); });
+    },
     'qr-demo': () => timbraQR(PFDemo.codicePunto()),
     'riposa-demo': ev => { ev.preventDefault(); toast('Nella app vera si apre Riposa, con il calcolo e la scorta della tua stalla.'); },
     'timbra-per': b => timbraPer(b.dataset.id),
