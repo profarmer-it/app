@@ -14,7 +14,7 @@
    ========================================================================== */
 
 const Documenti = (() => {
-  const VERSIONE = 'nomina-2026-11-v1';
+  const VERSIONE = 'nomina-2026-11-v2';   // v2 (30/10): il telefono collegato del dipendente
   const PF = 'Pro Farmer S.r.l.s., Via Milazzo 19, 26100 Cremona (CR), P.IVA 01797050190, info@profarmer.it';
   const e = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -47,8 +47,9 @@ e non li usa per finalità proprie, commerciali o di profilazione.</p>
 <h3>3. Interessati e dati</h3>
 <p>Interessati: i dipendenti e i collaboratori che il Titolare inserisce nell’app, e il Titolare stesso.
 Dati: nome e cognome, indirizzo e-mail (facoltativo), orario di contratto, PIN personale (conservato solo in forma non leggibile),
-orari di entrata e uscita, assenze e relativo tipo, turni, compiti, correzioni con il loro motivo; se il Titolare la attiva,
-l’indicazione «dentro» o «fuori» dall’area dell’azienda al momento della timbratura (la posizione non viene conservata).
+orari di entrata e uscita, assenze e relativo tipo, turni, compiti, correzioni con il loro motivo; un identificativo del telefono
+collegato dal dipendente; se il Titolare sceglie il controllo della posizione, l’indicazione «dentro», «fuori» o «senza posizione»
+rispetto all’area dell’azienda al momento della timbratura (le coordinate non vengono conservate).
 <b>Non si trattano dati biometrici</b> e non si traccia la posizione in continuo. La malattia è indicata solo come tipo di assenza, senza diagnosi.</p>
 
 <h3>4. Obblighi del Titolare</h3>
@@ -112,10 +113,11 @@ L’app è uno strumento di registrazione degli accessi e delle presenze ai sens
 orari di entrata e uscita; assenze e loro tipo (senza diagnosi); turni e compiti; eventuali correzioni del titolare con il motivo.</p>
 <ul>
 <li><b>Niente dati biometrici</b> (impronte, volto).</li>
-<li><b>Niente posizione in continuo.</b> ${az && az.posizione_attiva
-  ? 'Questa azienda ha attivato il controllo dell’area: solo nel momento in cui timbri, il telefono indica se sei dentro o fuori dall’area dell’azienda, e si conserva solo questo esito.'
+<li><b>Niente posizione in continuo.</b> ${az && (az.verifica || 'posizione') === 'posizione'
+  ? 'Quando timbri dal telefono, solo in quel momento il telefono indica se sei dentro o fuori dall’area dell’azienda: si conserva solo questo esito, mai le coordinate. Se non dai il permesso della posizione la timbratura vale lo stesso, segnata «senza posizione».'
   : 'La posizione del telefono non viene usata.'}</li>
-<li>Timbri inquadrando il QR appeso in azienda con il tuo telefono, oppure sul tablet aziendale con il tuo PIN. Il tuo PIN è personale: non darlo ai colleghi.</li>
+<li>Timbri dal tuo telefono (collegato una volta dal titolare, senza e-mail)${az && az.verifica === 'qr' ? ' inquadrando il QR appeso in azienda' : ''}, oppure sul tablet aziendale con il tuo PIN.
+Il collegamento e il PIN sono personali: non timbrare per i colleghi e non farlo fare a loro per te.</li>
 </ul>
 
 <h3>Chi li vede</h3>

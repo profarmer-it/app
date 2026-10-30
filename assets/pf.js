@@ -29,7 +29,7 @@ const PF = (() => {
   };
   const INDIRIZZO = 'https://easy.profarmer.it/';
   const DEMO = new URLSearchParams(location.search).has('demo');
-  const K_CODA = 'pf-coda', K_CHIOSCO = 'pf-chiosco';
+  const K_CODA = 'pf-coda', K_CHIOSCO = 'pf-chiosco', K_TEL = 'pf-telefono';
   const MANSIONI = ['Mungitura', 'Alimentazione', 'Pulizia cuccette', 'Vitelli', 'Manutenzione', 'Altro'];
   const TIPI = { ferie: 'Ferie', riposo: 'Riposo', permesso: 'Permesso', malattia: 'Malattia', assente: 'Assente' };
   const GIORNI = ['', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
@@ -207,8 +207,9 @@ const PF = (() => {
     const io = PFDemo.chi();
     return `<div class="barra-demo">DEMO · Sei
       <select id="demo-chi" aria-label="Chi sei nella demo">${PFDemo.persone().map(p =>
-        `<option value="${p.id}"${p.id === io && location.hash !== '#chiosco' ? ' selected' : ''}>${esc(p.nome)}${p.ruolo === 'titolare' ? ' (titolare)' : ''}</option>`).join('')}
-        <option value="tablet"${location.hash === '#chiosco' ? ' selected' : ''}>il tablet di stalla</option></select>
+        `<option value="${p.id}"${p.id === io && location.hash !== '#chiosco' && !(T && chiaveTel()) ? ' selected' : ''}>${esc(p.nome)}${p.ruolo === 'titolare' ? ' (titolare)' : ''}</option>`).join('')}
+        <option value="tablet"${location.hash === '#chiosco' ? ' selected' : ''}>il tablet di stalla</option>
+        <option value="telefono"${T && chiaveTel() ? ' selected' : ''}>Ion dal suo telefono</option></select>
       <button id="demo-ricomincia">Ricomincia</button></div>`;
   }
 
@@ -310,7 +311,9 @@ const PF = (() => {
     const mancanti = Conti.valide(A.timbrature).filter(t => t.verso === 'entrata' && (Date.now() - new Date(t.quando)) > 14 * 3600e3
       && (Date.now() - new Date(t.quando)) < 4 * 86400e3
       && !Conti.valide(A.timbrature).some(u => u.persona === t.persona && u.quando > t.quando));
+    const senzaArea = A.azienda.verifica === 'posizione' && !A.azienda.area;
     return `<p class="sotto">${dataLunga(oggi)}</p>
+      ${senzaArea ? '<div class="avviso">Segna l’area dell’azienda: Impostazioni → Regole → «Segna qui la posizione dell’azienda», stando in azienda. Senza, le timbrature dal telefono non dicono se si è dentro.</div>' : ''}
       ${mancanti.map(t => `<div class="avviso rosso">${esc(nome(persona(t.persona)))} è entrato ${dataIt(Conti.roma(t.quando).giorno)} alle ${ora(t.quando)}
         e non ha timbrato l'uscita. <button class="link" data-az="correggi" data-id="${t.id}">Sistema</button></div>`).join('')}
       <div class="scheda">${persone.map(p => `<div class="persona">
@@ -323,13 +326,14 @@ const PF = (() => {
       <div class="scheda">${di && di.length ? di.map(t => rigaTimbratura(t)).join('') : '<p class="lista-vuota">Ancora nessuna.</p>'}</div>
       <p class="sotto">Tocca una timbratura per correggerla. La riga di prima resta nello storico, con il motivo.</p>`;
   }
-  const MODI = { qr: 'QR', chiosco: 'tablet', titolare: 'dal titolare', correzione: 'corretta' };
+  const MODI = { qr: 'QR', chiosco: 'tablet', titolare: 'dal titolare', correzione: 'corretta', telefono: 'suo telefono' };
+  const AREE = { fuori: ' · <b style="color:var(--rosso)">fuori area</b>', nd: ' · posizione non data' };
   function rigaTimbratura(t) {
     const p = persona(t.persona);
     const vecchia = t.valida === false;
     return `<button class="riga" style="width:100%;text-align:left${vecchia ? ';opacity:.5;text-decoration:line-through' : ''}" ${vecchia ? 'disabled' : `data-az="correggi" data-id="${t.id}"`}>
       <span><b>${ora(t.quando)}</b> ${t.verso} · ${esc(p ? p.nome : '')}${t.motivo ? `<br><span class="sotto">${esc(t.motivo)}</span>` : ''}</span>
-      <span class="dx">${MODI[t.modo] || ''}${t.area === 'fuori' ? ' · fuori area' : ''}</span></button>`;
+      <span class="dx">${MODI[t.modo] || ''}${AREE[t.area] || ''}</span></button>`;
   }
 
   /* --------------------------------------------------------------- timbra */
@@ -368,7 +372,7 @@ const PF = (() => {
   function fermaOrologio() { if (orologio) clearInterval(orologio); orologio = null; }
 
   /* Il lettore del QR: BarcodeDetector se c'è, altrimenti jsQR. */
-  function inquadra() {
+  function inquadra(dopo) {
     let flusso = null, fermo = false;
     const el = document.createElement('div');
     el.className = 'lettore';
@@ -404,7 +408,7 @@ const PF = (() => {
             })());
           leggiTesto.then(t => {
             const c = codiceDa(t);
-            if (c) { chiudi(); timbraQR(c); } else setTimeout(giro, 180);
+            if (c) { chiudi(); (typeof dopo === 'function' ? dopo : timbraQR)(c); } else setTimeout(giro, 180);
           }).catch(() => setTimeout(giro, 300));
         };
         giro();
@@ -419,7 +423,7 @@ const PF = (() => {
   }
 
   function posizione() {
-    if (!A.azienda.posizione_attiva || !navigator.geolocation) return Promise.resolve(null);
+    if (A.azienda.verifica !== 'posizione' || !navigator.geolocation) return Promise.resolve(null);
     // solo adesso, una volta: niente posizione in continuo
     return new Promise(ok => navigator.geolocation.getCurrentPosition(
       p => ok({ lat: p.coords.latitude, lon: p.coords.longitude }), () => ok(null),
@@ -461,9 +465,9 @@ const PF = (() => {
     if (!q.length || svuoto || navigator.onLine === false) return Promise.resolve();
     svuoto = true;
     const resto = [];
-    return q.reduce((p, c) => p.then(() => rpc(c.tipo === 'qr' ? 'pf_timbra' : 'pf_chiosco_timbra', c.args)
+    return q.reduce((p, c) => p.then(() => rpc({ qr: 'pf_timbra', chiosco: 'pf_chiosco_timbra', telefono: 'pf_telefono_timbra' }[c.tipo], c.args)
       .catch(e => { if (!e.delDatabase) resto.push(c); })), Promise.resolve())
-      .then(() => { scrivi(K_CODA, resto.length ? resto : null); svuoto = false; if (resto.length < q.length && A) aggiorna(`Partite le timbrature salvate (${q.length - resto.length}).`); });
+      .then(() => { scrivi(K_CODA, resto.length ? resto : null); svuoto = false; if (resto.length < q.length && T) caricaTelefono(); if (resto.length < q.length && A) aggiorna(`Partite le timbrature salvate (${q.length - resto.length}).`); });
   }
   window.addEventListener('online', () => svuotaCoda());
   setInterval(() => svuotaCoda(), 60000);
@@ -697,7 +701,7 @@ const PF = (() => {
       <div class="scheda"><div class="riga"><span>Pausa</span><span class="dx">${A.azienda.pausa_minuti ? `${A.azienda.pausa_minuti} min oltre ${A.azienda.pausa_dopo_ore} ore` : 'nessuna'}</span></div>
         <div class="riga"><span>Promemoria a chi non timbra</span><span class="dx">${A.azienda.ritardo_minuti} min dopo l’inizio del turno</span></div>
         <div class="riga"><span>Avviso straordinari</span><span class="dx">oltre ${A.azienda.soglia_straordinari_mese} ore al mese</span></div>
-        <div class="riga"><span>Posizione al momento della timbratura</span><span class="dx">${A.azienda.posizione_attiva ? 'accesa' : 'spenta'}</span></div>
+        <div class="riga"><span>Controllo quando si timbra dal telefono</span><span class="dx">${{ posizione: 'posizione al momento', qr: 'QR in azienda', nessuna: 'nessuno' }[A.azienda.verifica] || 'posizione al momento'}${A.azienda.verifica === 'posizione' ? (A.azienda.area ? `, ${A.azienda.raggio_m} m` : ' · <b style="color:var(--rosso)">area da segnare</b>') : ''}</span></div>
         <button class="btn sec pieno" style="margin-top:10px" data-az="regole">Cambia le regole</button></div>
       <h2 class="sezione">Documenti</h2>
       <div class="scheda">
@@ -722,7 +726,13 @@ const PF = (() => {
       <p class="errore" id="p-err"></p>
       <button class="btn pieno" id="p-salva">Salva</button>
       ${p ? `<div class="riga-bottoni"><button class="btn sec" id="p-pin">${p.pin ? 'Cambia il PIN' : 'Dai un PIN'}</button>
-        ${p.email && p.id !== A.io.id ? `<button class="btn sec" id="p-invita">${p.invitato ? 'Rimanda l’accesso' : 'Manda l’accesso'}</button>` : ''}</div>` : ''}`, f => {
+        ${p.email && p.id !== A.io.id ? `<button class="btn sec" id="p-invita">${p.invitato ? 'Rimanda l’accesso' : 'Manda l’accesso'}</button>` : ''}</div>
+        ${p.id !== A.io.id ? `<h2 class="sezione">Il suo telefono</h2>
+        ${(A.telefoni || []).filter(t => t.persona === p.id).map(t => `<div class="riga"><span>Collegato il ${dataIt(Conti.roma(t.creato).giorno)}${t.ultimo_uso ? `, usato ${dataIt(Conti.roma(t.ultimo_uso).giorno)}` : ''}</span>
+          <span class="dx"><button class="btn piccolo sec" data-az="togli-telefono" data-id="${t.id}">Scollega</button></span></div>`).join('')
+          || '<p class="sotto">Nessun telefono collegato. Con il collegamento timbra dal suo telefono, senza e-mail.</p>'}
+        <button class="btn" id="p-tel">${(A.telefoni || []).some(t => t.persona === p.id) ? 'Collega un telefono nuovo' : 'Collega il suo telefono'}</button>` : ''}` : ''}`, f => {
+      const tel = f.querySelector('#p-tel'); if (tel) tel.addEventListener('click', () => collegaTelefono(p));
       f.querySelector('#p-salva').addEventListener('click', () => {
         const att = f.querySelector('#p-attivo');
         salvaE('pf_salva_persona', { p: { id: p ? p.id : '', nome: f.querySelector('#p-nome').value, cognome: f.querySelector('#p-cognome').value,
@@ -753,10 +763,7 @@ const PF = (() => {
   function foglioPunto(q) {
     foglio(q ? q.nome : 'Nuovo QR', `
       <div class="campo"><label for="q-nome">Dove sta</label><input id="q-nome" value="${esc(q ? q.nome : 'Sala mungitura')}"></div>
-      ${A.azienda.posizione_attiva ? `<div class="avviso">Area intorno alla stalla: ${q && q.lat ? `segnata (raggio ${q.raggio_m} m).` : 'non ancora segnata.'}
-        Mettiti dove sta il QR e premi «Segna la posizione qui». Il telefono di chi timbra dice solo se è dentro o fuori.</div>
-        <div class="campo"><label for="q-raggio">Raggio in metri</label><input id="q-raggio" type="number" inputmode="numeric" min="50" max="2000" value="${q ? q.raggio_m : 300}"></div>
-        <button class="btn sec" id="q-qui">Segna la posizione qui</button>` : ''}
+
       <p class="errore" id="q-err"></p>
       <button class="btn pieno" id="q-salva">Salva</button>
       ${q ? `<button class="btn chiaro" id="q-nuovo">Nuovo QR (il foglio vecchio non vale più)</button>
@@ -795,13 +802,29 @@ const PF = (() => {
         <div class="campo"><label for="r-pdopo">…oltre queste ore nel giorno</label><input id="r-pdopo" type="number" inputmode="decimal" min="0" max="16" step="0.5" value="${z.pausa_dopo_ore}"></div></div>
       <div class="campo"><label for="r-rit">Promemoria a chi non ha timbrato, minuti dopo l’inizio del turno</label><input id="r-rit" type="number" inputmode="numeric" min="5" max="240" value="${z.ritardo_minuti}"></div>
       <div class="campo"><label for="r-soglia">Avviso se gli straordinari del mese superano (ore)</label><input id="r-soglia" type="number" inputmode="numeric" min="0" max="200" value="${z.soglia_straordinari_mese}"></div>
-      <label class="spunta"><input type="checkbox" id="r-pos"${z.posizione_attiva ? ' checked' : ''}> <span>Controlla la posizione al momento della timbratura.
-        Si legge solo in quell’istante e si tiene solo «dentro» o «fuori dall’area». Da decidere con il consulente del lavoro.</span></label>
+      <div class="campo"><label for="r-ver">Quando si timbra dal telefono, controlla che sia in azienda con</label><select id="r-ver">
+        <option value="posizione"${(z.verifica || 'posizione') === 'posizione' ? ' selected' : ''}>la posizione, solo in quel momento</option>
+        <option value="qr"${z.verifica === 'qr' ? ' selected' : ''}>il QR appeso in azienda</option>
+        <option value="nessuna"${z.verifica === 'nessuna' ? ' selected' : ''}>nessun controllo</option></select></div>
+      <div id="r-area-c" class="campo"${(z.verifica || 'posizione') === 'posizione' ? '' : ' hidden'}>
+        <p class="sotto">L’area dell’azienda: ${z.area ? `segnata, raggio ${z.raggio_m} m.` : '<b>non ancora segnata</b>.'} Mettiti in azienda (per esempio in sala mungitura) e premi il pulsante.
+          Il telefono di chi timbra dice solo se è dentro o fuori, e solo in quel momento.</p>
+        <button class="btn sec" id="r-qui" type="button">Segna qui la posizione dell’azienda</button>
+        <label for="r-raggio">Raggio in metri</label><input id="r-raggio" type="number" inputmode="numeric" min="50" max="3000" value="${z.raggio_m || 300}"></div>
       <button class="btn pieno" id="r-salva">Salva</button>`, f => {
+      let lat, lon;
+      f.querySelector('#r-ver').addEventListener('change', ev => { f.querySelector('#r-area-c').hidden = ev.target.value !== 'posizione'; });
+      f.querySelector('#r-qui').addEventListener('click', ev => {
+        const b = ev.currentTarget; b.textContent = 'Cerco la posizione…';
+        if (DEMO) { lat = 45.2; lon = 10.0; b.textContent = 'Posizione segnata ✓'; return; }
+        navigator.geolocation.getCurrentPosition(q => { lat = q.coords.latitude; lon = q.coords.longitude; b.textContent = `Posizione segnata ✓ (precisione ${Math.round(q.coords.accuracy)} m)`; },
+          () => { b.textContent = 'Posizione non trovata: dai il permesso e riprova all’aperto'; }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+      });
       f.querySelector('#r-salva').addEventListener('click', () => salvaE('pf_salva_regole', { p: {
         pausa_minuti: f.querySelector('#r-pmin').value, pausa_dopo_ore: f.querySelector('#r-pdopo').value,
         ritardo_minuti: f.querySelector('#r-rit').value, soglia_straordinari_mese: f.querySelector('#r-soglia').value,
-        posizione_attiva: f.querySelector('#r-pos').checked } }, 'Regole salvate.', f));
+        verifica: f.querySelector('#r-ver').value, raggio_m: f.querySelector('#r-raggio').value,
+        ...(lat != null ? { lat, lon } : {}) } }, 'Regole salvate.', f));
     });
   }
   function foglioMansione(m) {
@@ -816,6 +839,124 @@ const PF = (() => {
         titolo: f.querySelector('#m-titolo').value, istruzioni: f.querySelector('#m-istr').value,
         persone: [...f.querySelectorAll('input[type=checkbox]:checked')].map(x => x.value) } }, 'Salvato.', f));
       const t = f.querySelector('#m-togli'); if (t) t.addEventListener('click', () => salvaE('pf_salva_mansione', { p: { id: m.id, togli: true } }, 'Tolto.', f));
+    });
+  }
+
+  /* ------------------------------------ il telefono del dipendente (30/10/2026)
+     Senza e-mail: il titolare crea un collegamento (una volta, 24 ore) e lo
+     mostra come QR o lo manda su WhatsApp; il telefono del dipendente lo apre
+     e riceve una chiave sua (pf-telefono). Da lì: «Entrata» / «Uscita». */
+  let T = null;   // l'area del dipendente sul suo telefono
+  function chiaveTel() { return DEMO ? (chiaveTel.demo || null) : leggi(K_TEL, null); }
+
+  function collegaTelefono(p) {
+    rpc('pf_nuovo_collegamento', { p_persona: p.id }).then(r => {
+      const link = `${INDIRIZZO}#collega=${r.codice}`;
+      const testo = `Ciao ${p.nome}, da oggi segni entrata e uscita dal tuo telefono con l'app Pro Farmer. Apri questo link (vale 24 ore, una volta sola): ${link}`;
+      foglio(`Il telefono di ${p.nome}`, `
+        <p class="sotto">Fai inquadrare questo QR con la fotocamera del suo telefono, oppure mandagli il link su WhatsApp.
+          Vale <b>24 ore e una volta sola</b>; se collega un altro telefono, quello di prima smette di funzionare.</p>
+        <div id="tel-qr" style="background:#fff;border-radius:16px;padding:14px;width:min(260px,100%);align-self:center"></div>
+        <a class="btn" href="https://wa.me/?text=${encodeURIComponent(testo)}" target="_blank" rel="noopener">Manda su WhatsApp</a>
+        <button class="btn sec" id="tel-copia">Copia il link</button>
+        <p class="sotto">Poi, sul suo telefono: «Aggiungi alla schermata Home» (su iPhone da Safari), così l’app si apre con un tocco.</p>`, f => {
+        caricaLib(LIB.qr, 'qrcode').then(qrcode => { const c = qrcode(0, 'M'); c.addData(link); c.make();
+          f.querySelector('#tel-qr').innerHTML = c.createSvgTag({ cellSize: 6, margin: 1, scalable: true }); }).catch(() => {});
+        f.querySelector('#tel-copia').addEventListener('click', () => {
+          (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(() => toast('Link copiato.')).catch(() => prompt('Copia il link:', link));
+        });
+      });
+    }).catch(e => toast(motivo(e)));
+  }
+
+  function collegaQuesto(codice) {
+    app().className = '';
+    app().innerHTML = `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer"><h1>Collego il telefono…</h1></div>`;
+    rpc('pf_collega_telefono', { p_codice: codice, p_dispositivo: navigator.userAgent.slice(0, 200) }).then(r => {
+      if (DEMO) chiaveTel.demo = r.chiave; else scrivi(K_TEL, r.chiave);
+      history.replaceState(null, '', location.pathname + location.search);
+      esito(true, `Ciao ${r.nome}`, `Questo telefono è collegato a ${r.azienda}. Da ora segni entrata e uscita da qui.`, () => caricaTelefono());
+    }).catch(e => {
+      app().innerHTML = `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
+        <h1>Collegamento non riuscito</h1><p class="sotto">${esc(motivo(e))}</p></div>`;
+    });
+  }
+
+  function caricaTelefono(msg) {
+    const k = chiaveTel();
+    return rpc('pf_telefono_area', { p_chiave: k }).then(r => { T = r; disegnaTelefono(msg); }).catch(e => {
+      if (e.delDatabase) {
+        if (!DEMO) scrivi(K_TEL, null);
+        app().innerHTML = `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
+          <h1>Telefono non collegato</h1><p class="sotto">${esc(e.message)}</p></div>`;
+        return;
+      }
+      if (T) disegnaTelefono('Senza rete: vedi i dati di prima; le timbrature restano qui e partono quando torna il segnale.');
+      else app().innerHTML = `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
+        <h1>Senza rete</h1><p class="sotto">Riprova quando torna il segnale.</p><button class="btn pieno" onclick="location.reload()">Riprova</button></div>`;
+    });
+  }
+
+  function disegnaTelefono(msg) {
+    fermaOrologio();
+    const oggi = Conti.oggi(), io = T.io;
+    const dentro = Conti.dentro(T.timbrature, io.id);
+    const coda = leggi(K_CODA, []).filter(c => c.tipo === 'telefono');
+    const turni = Conti.turniDelGiorno(T.turni, io.id, oggi);
+    const f = Conti.foglio(io, T.timbrature, T.assenze, T.azienda, oggi.slice(0, 7));
+    const diOggi = T.timbrature.filter(t => Conti.roma(t.quando).giorno === oggi).sort((a, b) => b.quando.localeCompare(a.quando));
+    const verifica = T.azienda.verifica;
+    app().className = '';
+    app().innerHTML = barraDemo() + `<header class="testa"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer"></header>
+      <main class="corpo" style="padding-bottom:32px">
+        <p class="saluto">Ciao ${esc(io.nome)}</p><p class="sotto">${esc(T.azienda.ragione)}</p>
+        <p class="orologio" id="orologio">${Conti.roma(new Date().toISOString()).ora}</p>
+        <p class="data">${dataLunga(oggi)}</p>
+        ${msg ? `<div class="avviso">${esc(msg)}</div>` : ''}
+        <button class="btn enorme" data-az="tel-timbra" data-verso="${dentro ? 'uscita' : 'entrata'}">${dentro ? 'Uscita · fine lavoro' : 'Entrata · inizio lavoro'}</button>
+        <p class="sotto" style="text-align:center">${verifica === 'posizione' ? 'Quando premi, il telefono dice solo se sei in azienda. Nessun tracciamento.'
+          : verifica === 'qr' ? 'Dopo il tocco inquadra il QR appeso in azienda.' : ''}</p>
+        ${coda.length ? `<div class="avviso">${coda.length === 1 ? 'Una timbratura è salvata' : coda.length + ' timbrature sono salvate'} sul telefono: partono quando torna la rete.</div>` : ''}
+        <div class="scheda"><h2 class="sezione" style="margin:0 0 2px">Oggi</h2>
+          ${diOggi.length ? diOggi.map(t => `<div class="riga"><span>${t.verso === 'entrata' ? 'Entrata' : 'Uscita'}</span><span class="dx">${ora(t.quando)}${AREE[t.area] || ''}</span></div>`).join('')
+            : '<p class="lista-vuota">Ancora niente.</p>'}
+          ${turni.length ? turni.map(t => `<div class="riga"><span>Turno: ${esc(t.mansione)}</span><span class="dx">${t.inizio}–${t.fine}</span></div>`).join('') : ''}</div>
+        <div class="scheda"><div class="riga"><span>Le tue ore di ${MESI[Number(oggi.slice(5, 7)) - 1]}</span><span class="dx">${Conti.hhmm(f.totale.lavoro)}</span></div></div>
+        <p class="sotto">Se hai sbagliato una timbratura, dillo al titolare: la corregge lui. Questo telefono timbra solo per ${esc(io.nome)}.</p>
+      </main>`;
+    avviaOrologio();
+  }
+
+  function posizioneOra() {
+    if (DEMO) return Promise.resolve({ lat: 45.2, lon: 10.0, precisione: 15 });
+    if (!navigator.geolocation) return Promise.resolve(null);
+    // solo adesso, una volta: niente posizione in continuo
+    return new Promise(ok => navigator.geolocation.getCurrentPosition(
+      p => ok({ lat: p.coords.latitude, lon: p.coords.longitude, precisione: p.coords.accuracy }), () => ok(null),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }));
+  }
+
+  function timbraTelefono(verso, codiceQr) {
+    const v = T.azienda.verifica;
+    if (v === 'qr' && !codiceQr) {
+      if (DEMO) return timbraTelefono(verso, PFDemo.codicePunto());
+      return inquadra(c => timbraTelefono(verso, c));
+    }
+    const quando = new Date().toISOString(), chiave = nuovaChiave();
+    const b = document.querySelector('[data-az="tel-timbra"]'); if (b) { b.disabled = true; b.textContent = v === 'posizione' ? 'Controllo la posizione…' : 'Un attimo…'; }
+    (v === 'posizione' ? posizioneOra() : Promise.resolve(null)).then(pos => {
+      const args = { p_chiave: chiaveTel(), p_verso: verso, p_ora_telefono: quando, p_chiave_invio: chiave, p_codice_qr: codiceQr || null,
+        p_lat: pos ? pos.lat : null, p_lon: pos ? pos.lon : null, p_precisione: pos ? pos.precisione : null };
+      rpc('pf_telefono_timbra', args).then(r => {
+        const nota = r.area === 'fuori' ? ' Risulti fuori dall’area dell’azienda: il titolare lo vede.'
+          : r.area === 'nd' ? ' Segnata senza posizione: dai il permesso della posizione all’app.' : '';
+        esito(true, r.verso === 'entrata' ? 'Entrata' : 'Uscita', `${r.gia ? 'Era già segnata alle' : 'Alle'} ${ora(r.quando)}.${nota}`, () => caricaTelefono());
+      }).catch(e => {
+        if (e.delDatabase) { esito(false, 'Non segnata', e.message, () => caricaTelefono()); return; }
+        metti({ tipo: 'telefono', args });
+        T.timbrature.push({ id: chiave, persona: T.io.id, verso, quando, modo: 'telefono', valida: true });
+        esito(true, 'Salvata sul telefono', `Sei senza rete: la timbratura delle ${ora(quando)} parte appena torna il segnale.`, () => disegnaTelefono());
+      });
     });
   }
 
@@ -1106,6 +1247,11 @@ const PF = (() => {
         location.hash = '#chiosco'; mostraChiosco();
       }).catch(e => toast(motivo(e)));
     },
+    'tel-timbra': b => timbraTelefono(b.dataset.verso),
+    'togli-telefono': b => {
+      if (!confirm('Scollego questo telefono? Non potrà più timbrare finché non lo ricolleghi.')) return;
+      rpc('pf_togli_telefono', { p_id: b.dataset.id }).then(() => { chiudiFoglio(); aggiorna('Telefono scollegato.'); }).catch(e => toast(motivo(e)));
+    },
     'togli-tablet': b => rpc('pf_togli_dispositivo', { p_id: b.dataset.id }).then(() => aggiorna('Tablet scollegato.')).catch(e => toast(motivo(e))),
     'chiosco-persona': b => pinChiosco(b.dataset.id),
     'chiosco-esci': () => {
@@ -1126,7 +1272,9 @@ const PF = (() => {
   document.addEventListener('change', ev => {
     if (ev.target.id !== 'demo-chi') return;
     const v = ev.target.value;
+    chiaveTel.demo = null; T = null;
     if (v === 'tablet') { location.hash = '#chiosco'; return mostraChiosco(); }
+    if (v === 'telefono') { chiaveTel.demo = 'demo.telefono.p-ion'; location.hash = ''; return caricaTelefono(); }
     PFDemo.diventa(v); location.hash = ''; carica();
   });
   document.addEventListener('click', ev => {
@@ -1137,6 +1285,8 @@ const PF = (() => {
   window.addEventListener('hashchange', () => {
     const h = location.hash;
     if (h === '#chiosco') return mostraChiosco();
+    const col = h.match(/#collega=([0-9a-z]{6,40})/i);
+    if (col) return collegaQuesto(col[1]);
     const c = codiceDa(h);
     if (c && A) { history.replaceState(null, '', location.pathname + location.search + '#timbra'); return timbraQR(c); }
     if (A) disegna();
@@ -1144,10 +1294,14 @@ const PF = (() => {
 
   function parti() {
     if ('serviceWorker' in navigator && !DEMO && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+    const col = location.hash.match(/#collega=([0-9a-z]{6,40})/i);
+    if (col) return collegaQuesto(col[1]);
     if (location.hash === '#chiosco' || (!DEMO && leggi(K_CHIOSCO, null) && !location.hash)) { location.hash = '#chiosco'; return mostraChiosco(); }
     const qr = codiceDa(location.hash);
     if (DEMO) return carica(() => { disegna(); if (qr) timbraQR(qr); });
     collegamento().auth.getSession().then(({ data }) => {
+      // il telefono di un dipendente collegato senza e-mail
+      if (!data.session && leggi(K_TEL, null)) return caricaTelefono();
       if (!data.session) return mostraAccesso(qr ? 'Entra con la tua e-mail, poi inquadra di nuovo il QR.' : '');
       carica(() => {
         if (qr) { history.replaceState(null, '', location.pathname + '#timbra'); disegna(); timbraQR(qr); } else disegna();

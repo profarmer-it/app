@@ -105,13 +105,14 @@ const PFDemo = (() => {
     }
     return {
       azienda: { id: AZ, ragione: 'Cascina Demo', comune: 'Soresina', pausa_dopo_ore: 6, pausa_minuti: 0, ritardo_minuti: 15,
-        soglia_straordinari_mese: 30, posizione_attiva: false, cliente_piulact: true,
-        nomina: { versione: 'nomina-2026-11-v1', il: new Date(Date.now() - 20 * 864e5).toISOString(), da: 'Marco Rossi' } },
+        soglia_straordinari_mese: 30, posizione_attiva: true, cliente_piulact: true, verifica: 'posizione', area: true, raggio_m: 300,
+        nomina: { versione: 'nomina-2026-11-v2', il: new Date(Date.now() - 20 * 864e5).toISOString(), da: 'Marco Rossi' } },
       piano: { piano: 'regalo', stato: 'attivo', fino_al: null },
       persone, turni, mansioni, timbrature, assenze: ass,
       punti: [{ id: 'q-sala', nome: 'Sala mungitura', codice: 'demo-sala-mungitura', lat: null, lon: null, raggio_m: 300, attivo: true },
               { id: 'q-uff', nome: 'Ufficio', codice: 'demo-ufficio', lat: null, lon: null, raggio_m: 300, attivo: true }],
       dispositivi: [{ id: 'd-tablet', nome: 'Tablet in sala mungitura', attivo: true, ultimo_uso: new Date().toISOString() }],
+      telefoni: [{ id: 'tel-ion', persona: 'p-ion', dispositivo: 'iPhone', creato: new Date(Date.now() - 9 * 864e5).toISOString(), ultimo_uso: new Date().toISOString() }],
       settimane: [Conti.lunediDi(oggi)],
       stalla: { testo: 'piùLact Pronto in ballette: scorta per 23 giorni. Il promemoria arriva da solo.' }
     };
@@ -155,7 +156,7 @@ const PFDemo = (() => {
         io: { ...pubblica(me()), email: me().email, ore_giorno: me().ore_giorno, pin: !!me().pin },
         azienda: d.azienda, piano: d.piano,
         persone: d.persone.filter(p => p.attivo || tit).map(pubblica),
-        punti: tit ? d.punti : [], dispositivi: tit ? d.dispositivi : [],
+        punti: tit ? d.punti : [], dispositivi: tit ? d.dispositivi : [], telefoni: tit ? (d.telefoni || []) : [],
         timbrature: tit ? d.timbrature : d.timbrature.filter(t => t.persona === io && t.valida),
         assenze: d.assenze.filter(a => a.stato !== 'annullata' && (tit || a.persona === io || a.stato === 'approvata'))
           .map(a => tit || a.persona === io ? a : { id: a.id, persona: a.persona, tipo: 'assente', dal: a.dal, al: a.al, stato: a.stato }),
@@ -283,7 +284,22 @@ const PFDemo = (() => {
       if (p.pin !== p_pin) return { ok: false, motivo: 'PIN sbagliato.' };
       return scrivi(p.id, p_verso, 'chiosco', p_ora_telefono, p_chiave_invio);
     },
-    pf_accetta_nomina() { titolare(); d.azienda.nomina = { versione: 'nomina-2026-11-v1', il: new Date().toISOString(), da: me().nome }; salva(); return { ok: true }; },
+    pf_accetta_nomina() { titolare(); d.azienda.nomina = { versione: 'nomina-2026-11-v2', il: new Date().toISOString(), da: me().nome }; salva(); return { ok: true }; },
+    // il telefono del dipendente (30/10/2026): nella demo è sempre quello di Ion
+    pf_nuovo_collegamento({ p_persona }) { titolare(); return { ok: true, codice: 'demo' + p_persona.slice(2, 8), nome: persona(p_persona).nome }; },
+    pf_collega_telefono() { return { ok: true, chiave: 'demo.telefono.p-ion', nome: 'Ion', azienda: d.azienda.ragione }; },
+    pf_telefono_area({ p_chiave }) {
+      if (p_chiave !== 'demo.telefono.p-ion') err('Questo telefono non è più collegato: chiedi al titolare un collegamento nuovo.');
+      const p = persona('p-ion');
+      return { ok: true, io: { id: p.id, nome: p.nome, cognome: p.cognome, ore_giorno: p.ore_giorno }, azienda: d.azienda,
+        timbrature: d.timbrature.filter(t => t.persona === p.id && t.valida), turni: d.turni.filter(u => u.persona === p.id),
+        assenze: d.assenze.filter(a => a.persona === p.id && a.stato === 'approvata') };
+    },
+    pf_telefono_timbra({ p_chiave, p_verso, p_ora_telefono, p_chiave_invio }) {
+      if (p_chiave !== 'demo.telefono.p-ion') err('Questo telefono non è più collegato.');
+      return { ...scrivi('p-ion', p_verso, 'telefono', p_ora_telefono, p_chiave_invio, { area: 'dentro' }), area: 'dentro' };
+    },
+    pf_togli_telefono({ p_id }) { titolare(); d.telefoni = (d.telefoni || []).filter(t => t.id !== p_id); salva(); return { ok: true }; },
     pf_salva_iscrizione() { return { ok: true }; },
     pf_togli_iscrizione() { return { ok: true }; }
   };
