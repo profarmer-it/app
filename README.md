@@ -1,6 +1,6 @@
 # App Pro Farmer
 
-L'app di Pro Farmer per l'allevatore, su **app.profarmer.it** (dal novembre 2026).
+L'app di Pro Farmer per l'allevatore, su **easy.profarmer.it** (dal novembre 2026).
 Si installa sul telefono come un'app e dentro ci sono:
 
 - **Riposa**: il calcolo di piùLact per la stalla, la scorta e il promemoria del

@@ -1,7 +1,7 @@
 /* ============================================================================
    App Pro Farmer · la demo (dal 29/10/2026)
    ----------------------------------------------------------------------------
-   app.profarmer.it/?demo apre l'app con un'azienda finta, «Cascina Demo»,
+   easy.profarmer.it/?demo apre l'app con un'azienda finta, «Cascina Demo»,
    tutta dentro il telefono: niente parte verso Supabase. Serve per la serata
    del 19/11, per gli agenti che la mostrano ai clienti, e come collaudo
    (fa le veci del database: stesse funzioni pf_* di 36-app-pro-farmer.sql,

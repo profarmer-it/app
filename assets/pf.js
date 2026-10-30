@@ -27,7 +27,7 @@ const PF = (() => {
     qr: 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js',
     xlsx: 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
   };
-  const INDIRIZZO = 'https://app.profarmer.it/';
+  const INDIRIZZO = 'https://easy.profarmer.it/';
   const DEMO = new URLSearchParams(location.search).has('demo');
   const K_CODA = 'pf-coda', K_CHIOSCO = 'pf-chiosco';
   const MANSIONI = ['Mungitura', 'Alimentazione', 'Pulizia cuccette', 'Vitelli', 'Manutenzione', 'Altro'];
@@ -410,7 +410,7 @@ const PF = (() => {
       }).catch(e => msg(e.message));
     }).catch(() => msg('Serve il permesso della fotocamera: dagli l’ok nelle impostazioni del telefono, o inquadra il QR con la fotocamera.'));
   }
-  // il QR contiene https://app.profarmer.it/#t=<codice>
+  // il QR contiene https://easy.profarmer.it/#t=<codice>
   function codiceDa(t) {
     if (!t) return null;
     const m = String(t).match(/[#&?]t=([0-9a-z-]{8,40})/i);
