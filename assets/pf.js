@@ -29,7 +29,7 @@ const PF = (() => {
   };
   const INDIRIZZO = 'https://easy.profarmer.it/';
   const DEMO = new URLSearchParams(location.search).has('demo');
-  const K_CODA = 'pf-coda', K_CHIOSCO = 'pf-chiosco', K_TEL = 'pf-telefono';
+  const K_CODA = 'pf-coda', K_CHIOSCO = 'pf-chiosco';
   const MANSIONI = ['Mungitura', 'Alimentazione', 'Pulizia cuccette', 'Vitelli', 'Manutenzione', 'Altro'];
   const TIPI = { ferie: 'Ferie', riposo: 'Riposo', permesso: 'Permesso', malattia: 'Malattia', assente: 'Assente' };
   const GIORNI = ['', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
@@ -110,8 +110,10 @@ const PF = (() => {
       ${msg ? `<p class="errore" role="alert">${esc(msg)}</p>` : ''}
       ${info ? `<p class="sotto" role="status">${esc(info)}</p>` : ''}
       <p class="sotto"><a href="#" id="col-codice">Primo accesso o password dimenticata? Ricevi un codice per e-mail</a></p>
-      <p class="sotto">Non hai l'accesso? Lo attiva Pro Farmer per il titolare, e il titolare per i suoi dipendenti.
-        Per sapere di più: <a href="mailto:info@profarmer.it">info@profarmer.it</a>.</p>
+      <div class="scheda"><b>Non hai ancora un account?</b>
+        <p class="sotto" style="margin:4px 0 10px">Easy è gratuita per i clienti piùLact: crei l'account, chiedi l'attivazione e Pro Farmer ti abilita.
+          Se sei un dipendente, l'accesso te lo manda il tuo titolare.</p>
+        <button class="btn sec pieno" id="crea">Crea l'account</button></div>
       <p class="sotto"><a href="?demo">Guarda la demo</a> · <a href="#chiosco">Questo è il tablet di stalla</a></p>
     </div>`;
     occhio();
@@ -120,6 +122,7 @@ const PF = (() => {
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) { mostraAccesso('Scrivi un’e-mail completa, per esempio nome@libero.it.'); return null; }
       return (emailAccesso = e);
     };
+    document.getElementById('crea').addEventListener('click', () => mostraCrea());
     document.getElementById('col-codice').addEventListener('click', ev => {
       ev.preventDefault();
       const e = leggiEmail(); if (e) chiediCodice(e, ev.currentTarget);
@@ -139,14 +142,42 @@ const PF = (() => {
       });
     });
   }
-  function chiediCodice(e, el) {
+  // Crea l'account: e-mail, codice, password; poi la richiesta a Pro Farmer.
+  function mostraCrea(msg) {
+    fermaOrologio();
+    app().className = '';
+    app().innerHTML = `<div class="accesso">
+      <img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
+      <h1>Crea l'account</h1>
+      <p class="sotto">Scrivi la tua e-mail: ti mandiamo un codice di 6 cifre per confermarla, poi scegli la password.</p>
+      <form id="f-crea" class="campo" novalidate>
+        <label for="c-email">La tua e-mail</label>
+        <input id="c-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" value="${esc(emailAccesso)}">
+        <button class="btn pieno" style="margin-top:8px">Mandami il codice</button>
+      </form>
+      ${msg ? `<p class="errore" role="alert">${esc(msg)}</p>` : ''}
+      <p class="sotto"><a href="#" id="torna">← Ho già un account</a></p>
+    </div>`;
+    document.getElementById('torna').addEventListener('click', ev => { ev.preventDefault(); mostraAccesso(); });
+    document.getElementById('f-crea').addEventListener('submit', ev => {
+      ev.preventDefault();
+      const e = document.getElementById('c-email').value.trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return mostraCrea('Scrivi un’e-mail completa, per esempio nome@libero.it.');
+      emailAccesso = e;
+      chiediCodice(e, ev.currentTarget.querySelector('.btn'), true);
+    });
+  }
+  function chiediCodice(e, el, crea) {
     if (el) { el.style.pointerEvents = 'none'; el.textContent = 'Mando il codice…'; }
-    collegamento().auth.signInWithOtp({ email: e, options: { shouldCreateUser: false } }).then(({ error }) => {
+    const torna = crea ? mostraCrea : mostraAccesso;
+    collegamento().auth.signInWithOtp({ email: e, options: { shouldCreateUser: !!crea, data: crea ? { app: 'pf' } : undefined } }).then(({ error }) => {
       if (!error) return mostraCodice();
       const m = String(error.message || '');
-      if (error.status === 429 || /rate|seconds|too many/i.test(m)) return mostraAccesso('Hai chiesto il codice da poco: aspetta un minuto e riprova.');
-      if (/signup|not allowed|not found|user/i.test(m)) return mostraAccesso('Questa e-mail non è registrata. Controlla di averla scritta bene, o chiedi al tuo titolare.');
-      mostraAccesso(navigator.onLine === false ? 'Sei senza rete: riprova quando torna il segnale.' : 'Non riesco a mandare il codice: riprova tra poco.');
+      if (error.status === 429 || /rate|seconds|too many/i.test(m)) return torna('Hai chiesto il codice da poco: aspetta un minuto e riprova.');
+      if (/signup|not allowed|not found|user/i.test(m)) return crea
+        ? torna('Le registrazioni non sono ancora aperte: scrivi a info@profarmer.it.')
+        : mostraAccesso('Questa e-mail non ha un account: tocca «Crea l’account», o chiedi al tuo titolare.');
+      torna(navigator.onLine === false ? 'Sei senza rete: riprova quando torna il segnale.' : 'Non riesco a mandare il codice: riprova tra poco.');
     });
   }
   function mostraCodice(msg) {
@@ -169,11 +200,12 @@ const PF = (() => {
       const codice = c.value.replace(/\D/g, '');
       if (codice.length !== 6) return mostraCodice('Il codice ha 6 cifre.');
       const b = ev.currentTarget.querySelector('button'); b.disabled = true; b.textContent = 'Controllo…';
-      collegamento().auth.verifyOtp({ email: emailAccesso, token: codice, type: 'email' }).then(({ data, error }) => {
+      collegamento().auth.verifyOtp({ email: emailAccesso, token: codice, type: 'email' }).then(({ error }) => {
         if (error) return mostraCodice(/expired|invalid/i.test(error.message)
           ? 'Codice sbagliato o scaduto. Ricontrolla, o chiedine uno nuovo.' : 'Non riesco a controllare il codice: riprova tra poco.');
-        const u = data && data.user;
-        mostraPassword(() => carica(), !!(u && u.user_metadata && u.user_metadata.password_scelta));
+        // dopo il codice la password si sceglie sempre: chi avesse registrato prima
+        // questa e-mail con una password sua (account non confermato) la perde
+        mostraPassword(() => carica(), false);
       });
     });
   }
@@ -224,6 +256,59 @@ const PF = (() => {
       b.setAttribute('aria-pressed', String(vedi));
     }));
   }
+  /* ----------------------------------------- la richiesta di attivazione
+     Chi ha creato l'account ma non è ancora dentro un'azienda: la richiesta a
+     Pro Farmer (cliente piùLact?), poi l'attesa; se rifiutata, il motivo. */
+  function richiesta(msg) {
+    rpc('pf_mia_richiesta').then(r => {
+      emailAccesso = r.email || emailAccesso;
+      const q = r.richiesta;
+      if (r.persona) return schermo('Accesso sospeso', `<p class="sotto">${esc(msg || 'Presenze e turni non è attiva per la tua azienda in questo momento. Scrivi a info@profarmer.it.')}</p>`);
+      if (q && q.stato === 'in_attesa') return schermo('Richiesta inviata', `<p class="sotto">Il ${dataIt(Conti.roma(q.creata).giorno)} hai chiesto Easy per <b>${esc(q.ragione)}</b>.
+        Pro Farmer controlla che sia cliente piùLact e ti abilita: ti arriva un'e-mail. Di solito entro un giorno lavorativo.</p>
+        <button class="btn pieno" data-az="ricarica">Ho ricevuto l'e-mail: entra</button>`);
+      formRichiesta(q && q.stato === 'rifiutata' ? q : null, msg);
+    }).catch(e => schermo('Non riesco a caricare', `<p class="sotto">${esc(motivo(e))}</p><button class="btn pieno" data-az="ricarica">Riprova</button>`));
+  }
+  function schermo(titolo, corpo) {
+    fermaOrologio();
+    app().className = '';
+    app().innerHTML = `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
+      <h1>${esc(titolo)}</h1>${corpo}
+      <p class="sotto">Scritto da <b>${esc(emailAccesso)}</b> · <a href="#" data-az="esci">Esci</a></p></div>`;
+  }
+  function formRichiesta(rifiutata, msg) {
+    const v = formRichiesta.valori || {};
+    const campo = (id, et, extra = '') => `<div class="campo"><label for="r-${id}">${et}</label><input id="r-${id}" value="${esc(v[id] || '')}" ${extra}></div>`;
+    schermo('Chiedi Easy per la tua azienda', `
+      ${rifiutata ? `<div class="avviso">La richiesta per ${esc(rifiutata.ragione)} non è stata accettata: ${esc(rifiutata.motivo || '')}</div>` : ''}
+      <p class="sotto">Easy è gratuita per i clienti piùLact, senza limiti di dipendenti. Pro Farmer controlla e ti abilita.
+        <b>Sei un dipendente?</b> Non serve: chiedi al tuo titolare di mandarti l'accesso.</p>
+      <form id="f-rich" class="campo" novalidate style="gap:12px">
+        <div class="due">${campo('nome', 'Il tuo nome', 'autocomplete="given-name"')}${campo('cognome', 'Cognome', 'autocomplete="family-name"')}</div>
+        ${campo('ragione', 'Ragione sociale dell’azienda', 'autocomplete="organization"')}
+        ${campo('piva', 'Partita IVA', 'inputmode="numeric" maxlength="13"')}
+        <div class="due">${campo('comune', 'Comune', 'autocomplete="address-level2"')}${campo('provincia', 'Provincia (sigla)', 'maxlength="2" autocapitalize="characters"')}</div>
+        ${campo('telefono', 'Telefono', 'type="tel" inputmode="tel" autocomplete="tel"')}
+        ${campo('nota', 'Da chi compri piùLact? (facoltativo)', 'placeholder="Per esempio: l’agente Rossi, o Pro Farmer"')}
+        <label class="spunta"><input type="checkbox" id="r-ok"> <span>Ho letto e accetto le <a href="#" data-az="doc-condizioni">condizioni d’uso di Easy</a>
+          e l'<a href="https://www.iubenda.com/privacy-policy/12376136" target="_blank" rel="noopener">informativa privacy</a>.</span></label>
+        <button class="btn pieno">Manda la richiesta</button>
+      </form>
+      ${msg ? `<p class="errore" role="alert">${esc(msg)}</p>` : ''}`);
+    document.getElementById('f-rich').addEventListener('submit', ev => {
+      ev.preventDefault();
+      const d = {};
+      ['nome', 'cognome', 'ragione', 'piva', 'comune', 'provincia', 'telefono', 'nota'].forEach(k => { d[k] = document.getElementById('r-' + k).value.trim(); });
+      formRichiesta.valori = d;
+      if (!d.nome || d.ragione.length < 2) return formRichiesta(rifiutata, 'Scrivi il tuo nome e la ragione sociale.');
+      if (!/^(IT)?\s*\d{11}$/i.test(d.piva.replace(/\s/g, ''))) return formRichiesta(rifiutata, 'La partita IVA ha 11 cifre.');
+      if (!document.getElementById('r-ok').checked) return formRichiesta(rifiutata, 'Per mandare la richiesta accetta le condizioni d’uso.');
+      const b = ev.currentTarget.querySelector('.btn'); b.disabled = true; b.textContent = 'Mando…';
+      rpc('pf_chiedi', { p: { ...d, condizioni: Documenti.CONDIZIONI } }).then(() => { formRichiesta.valori = null; richiesta(); })
+        .catch(e => formRichiesta(rifiutata, motivo(e)));
+    });
+  }
   function esci() {
     togliNotifiche().finally(() => {
       if (DEMO) { location.href = location.pathname; return; }
@@ -235,8 +320,8 @@ const PF = (() => {
   function carica(dopo) {
     return rpc('pf_area').then(r => {
       if (!r || !r.ok) {
-        if (!DEMO) collegamento().auth.signOut();
-        return mostraAccesso('Il tuo accesso all’app Pro Farmer non è attivo. Chiedi al tuo titolare, o a Pro Farmer.');
+        if (DEMO) return mostraAccesso('Il tuo accesso all’app Pro Farmer non è attivo.');
+        return richiesta();
       }
       A = r;
       if (A.persone && !A.persone.find(p => p.id === A.io.id)) A.persone.push(A.io);
@@ -282,9 +367,8 @@ const PF = (() => {
     const io = PFDemo.chi();
     return `<div class="barra-demo">DEMO · Sei
       <select id="demo-chi" aria-label="Chi sei nella demo">${PFDemo.persone().map(p =>
-        `<option value="${p.id}"${p.id === io && location.hash !== '#chiosco' && !(T && chiaveTel()) ? ' selected' : ''}>${esc(p.nome)}${p.ruolo === 'titolare' ? ' (titolare)' : ''}</option>`).join('')}
-        <option value="tablet"${location.hash === '#chiosco' ? ' selected' : ''}>il tablet di stalla</option>
-        <option value="telefono"${T && chiaveTel() ? ' selected' : ''}>Ion dal suo telefono</option></select>
+        `<option value="${p.id}"${p.id === io && location.hash !== '#chiosco' ? ' selected' : ''}>${esc(p.nome)}${p.ruolo === 'titolare' ? ' (titolare)' : ''}</option>`).join('')}
+        <option value="tablet"${location.hash === '#chiosco' ? ' selected' : ''}>il tablet di stalla</option></select>
       <button id="demo-ricomincia">Ricomincia</button></div>`;
   }
 
@@ -331,38 +415,19 @@ const PF = (() => {
   function assenzaDel(pid, g) {
     return A.assenze.find(a => a.persona === pid && a.stato === 'approvata' && g >= a.dal && g <= a.al && a.tipo !== 'permesso');
   }
-  /* «La tua stalla» di Riposa: sta su questo telefono (riposa/ è dello stesso sito). */
-  function stallaRiposa() {
-    const d = leggi('riposa-allevatore', null);
-    if (!d || !d.id) return null;
-    const prodotto = d.prodotto || 'piùLact';
-    if (d.scorta && d.scorta.avviso) {
-      const giorni = Math.round((new Date(d.scorta.avviso + 'T12:00:00Z') - new Date(Conti.oggi() + 'T12:00:00Z')) / 864e5);
-      return { testo: giorni > 0 ? `${prodotto}: ti avvisiamo fra ${giorni} giorni, prima che finisca.`
-        : `${prodotto}: è ora di riordinare.` };
-    }
-    return { testo: `${prodotto}: dicci la scorta e ti avvisiamo prima che finisca.` };
-  }
   function vHome() {
     const { dip, dentro, assenti } = chiDentro();
     const chieste = A.assenze.filter(a => a.stato === 'chiesta').length;
-    const st = A.stalla || stallaRiposa();
     return `<div><p class="saluto">${saluto()}, ${esc(A.io.nome)}</p><p class="sotto">${esc(A.azienda.ragione)}</p></div>
       <a href="#oggi" class="scheda forte app-card" style="text-decoration:none">
         <span class="ico" style="background:var(--inchiostro);color:var(--arancio)">${svg('oggi')}</span>
         <span><b>Presenze e turni</b><span class="sotto">Adesso in stalla ${dentro.length} su ${dip.length}${assenti.length ? ` · ${assenti.length} assent${assenti.length > 1 ? 'i' : 'e'}` : ''}.</span>
         ${chieste ? `<span class="chip nero" style="margin-top:6px">${chieste} da approvare</span>` : ''}</span></a>
-      <a href="${DEMO ? '#home' : 'riposa/'}" class="scheda chiara app-card" style="text-decoration:none" ${DEMO ? 'data-az="riposa-demo"' : ''}>
-        <img class="ico" src="assets/riposa.png" alt="">
-        <span><b>Riposa</b><span class="sotto">${st ? esc(st.testo)
-          : 'Il calcolo di piùLact per la tua stalla, la scorta e il promemoria del riordino.'}</span></span></a>
-      <div class="scheda app-card"><span class="ico" style="background:var(--fondo-3);color:var(--testo-2)">+</span>
-        <span><b>Altre app</b><span class="sotto">In arrivo, sempre qui dentro.</span></span></div>
       <div class="scheda"><h2 class="sezione" style="margin:0 0 4px">Adesso in stalla</h2>
         ${dentro.length ? `<b>${dentro.map(p => esc(p.nome)).join(', ')}</b>` : '<span class="sotto">Nessuno.</span>'}
         ${assenti.length ? `<span class="sotto"> · fuori ${assenti.map(p => esc(p.nome) + ' (' + TIPI[assenzaDel(p.id, Conti.oggi()).tipo].toLowerCase() + ')').join(', ')}</span>` : ''}</div>
-      ${A.piano && A.piano.piano === 'regalo' ? '<p class="sotto">Presenze e turni è in regalo con piùLact.</p>'
-        : A.piano && A.piano.fino_al ? `<p class="sotto">Il tuo piano vale fino al ${dataIt(A.piano.fino_al)}.</p>` : ''}`;
+      <p class="sotto">Easy è gratuita per i clienti piùLact. Per la tua stalla c’è anche
+        <a href="https://riposa.profarmer.it/" target="_blank" rel="noopener">Riposa</a>, il calcolo di piùLact e il promemoria del riordino.</p>`;
   }
 
   /* ------------------------------------------------------- oggi (titolare) */
@@ -420,14 +485,17 @@ const PF = (() => {
     const dentro = Conti.dentro(A.timbrature, A.io.id);
     const turni = Conti.turniDelGiorno(A.turni, A.io.id, oggi);
     const u = ultimaMia();
-    const coda = leggi(K_CODA, []).filter(c => c.tipo === 'qr');
+    const coda = leggi(K_CODA, []).filter(c => c.tipo === 'qr' || c.tipo === 'io');
+    const verifica = A.azienda.verifica;
     const f = Conti.foglio(A.io, A.timbrature, A.assenze, A.azienda, oggi.slice(0, 7));
     const a = assenzaDel(A.io.id, oggi);
     return `<p class="saluto">Ciao ${esc(A.io.nome)}</p>
       <p class="orologio" id="orologio">${Conti.roma(new Date().toISOString()).ora}</p>
       <p class="data">${dataLunga(oggi)}</p>
       ${a ? `<div class="avviso">Oggi sei in ${TIPI[a.tipo].toLowerCase()}.</div>` : ''}
-      <button class="btn enorme" data-az="inquadra">${svg('timbra')} Inquadra il QR · ${dentro ? 'Uscita' : 'Entrata'}</button>
+      <button class="btn enorme" data-az="timbra-io" data-verso="${dentro ? 'uscita' : 'entrata'}">${verifica === 'qr' ? svg('timbra') + ' ' : ''}${dentro ? 'Uscita · fine lavoro' : 'Entrata · inizio lavoro'}</button>
+      <p class="sotto" style="text-align:center">${verifica === 'posizione' ? 'Quando premi, il telefono dice solo se sei in azienda. Nessun tracciamento.'
+        : verifica === 'qr' ? 'Dopo il tocco inquadra il QR appeso in azienda.' : ''}</p>
       ${coda.length ? `<div class="avviso">${coda.length === 1 ? 'Una timbratura è salvata' : coda.length + ' timbrature sono salvate'} sul telefono:
         partono da sole quando torna la rete.</div>` : ''}
       <div class="scheda"><h2 class="sezione" style="margin:0 0 2px">Il tuo turno di oggi</h2>
@@ -436,7 +504,7 @@ const PF = (() => {
       <div class="scheda"><div class="riga"><span>Ultima timbratura</span><span class="dx">${u
         ? `${Conti.roma(u.quando).giorno === oggi ? 'oggi' : dataIt(Conti.roma(u.quando).giorno)}, ${u.verso} ${ora(u.quando)}` : '—'}</span></div>
         <div class="riga"><span>Le tue ore di ${MESI[Number(oggi.slice(5, 7)) - 1]}</span><span class="dx">${Conti.hhmm(f.totale.lavoro)}</span></div></div>
-      ${DEMO ? '<button class="btn chiaro" data-az="qr-demo">Nella demo: fai finta di inquadrare il QR</button>' : ''}`;
+      <p class="sotto">Se hai sbagliato una timbratura, dillo al titolare: la corregge lui.</p>`;
   }
   function avviaOrologio() {
     orologio = setInterval(() => {
@@ -540,9 +608,9 @@ const PF = (() => {
     if (!q.length || svuoto || navigator.onLine === false) return Promise.resolve();
     svuoto = true;
     const resto = [];
-    return q.reduce((p, c) => p.then(() => rpc({ qr: 'pf_timbra', chiosco: 'pf_chiosco_timbra', telefono: 'pf_telefono_timbra' }[c.tipo], c.args)
+    return q.reduce((p, c) => p.then(() => rpc({ qr: 'pf_timbra', chiosco: 'pf_chiosco_timbra', io: 'pf_timbra_io' }[c.tipo], c.args)
       .catch(e => { if (!e.delDatabase) resto.push(c); })), Promise.resolve())
-      .then(() => { scrivi(K_CODA, resto.length ? resto : null); svuoto = false; if (resto.length < q.length && T) caricaTelefono(); if (resto.length < q.length && A) aggiorna(`Partite le timbrature salvate (${q.length - resto.length}).`); });
+      .then(() => { scrivi(K_CODA, (resto.length ? resto : null)); svuoto = false; if (resto.length < q.length && A) aggiorna(`Partite le timbrature salvate (${q.length - resto.length}).`); });
   }
   window.addEventListener('online', () => svuotaCoda());
   setInterval(() => svuotaCoda(), 60000);
@@ -794,7 +862,7 @@ const PF = (() => {
     foglio(p ? nome(p) : 'Nuova persona', `
       <div class="due"><div class="campo"><label for="p-nome">Nome</label><input id="p-nome" value="${esc(p ? p.nome : '')}" autocomplete="off"></div>
         <div class="campo"><label for="p-cognome">Cognome</label><input id="p-cognome" value="${esc(p ? p.cognome : '')}" autocomplete="off"></div></div>
-      <div class="campo"><label for="p-email">E-mail (facoltativa: senza, timbra dal tablet con il PIN)</label>
+      <div class="campo"><label for="p-email">E-mail (per timbrare dal suo telefono; senza, timbra dal tablet con il PIN)</label>
         <input id="p-email" type="email" inputmode="email" autocapitalize="off" value="${esc(p ? p.email || '' : '')}"></div>
       <div class="campo"><label for="p-ore">Orario di contratto, ore al giorno</label><input id="p-ore" type="number" inputmode="decimal" min="0" max="16" step="0.5" value="${p ? p.ore_giorno : 8}"></div>
       ${p && !tit && p.id !== A.io.id ? `<label class="spunta"><input type="checkbox" id="p-attivo"${p.attivo !== false ? ' checked' : ''}> <span>Lavora ancora qui (togli la spunta quando smette: le sue ore restano)</span></label>` : ''}
@@ -802,12 +870,8 @@ const PF = (() => {
       <button class="btn pieno" id="p-salva">Salva</button>
       ${p ? `<div class="riga-bottoni"><button class="btn sec" id="p-pin">${p.pin ? 'Cambia il PIN' : 'Dai un PIN'}</button>
         ${p.email && p.id !== A.io.id ? `<button class="btn sec" id="p-invita">${p.invitato ? 'Rimanda l’accesso' : 'Manda l’accesso'}</button>` : ''}</div>
-        ${p.id !== A.io.id ? `<h2 class="sezione">Il suo telefono</h2>
-        ${(A.telefoni || []).filter(t => t.persona === p.id).map(t => `<div class="riga"><span>Collegato il ${dataIt(Conti.roma(t.creato).giorno)}${t.ultimo_uso ? `, usato ${dataIt(Conti.roma(t.ultimo_uso).giorno)}` : ''}</span>
-          <span class="dx"><button class="btn piccolo sec" data-az="togli-telefono" data-id="${t.id}">Scollega</button></span></div>`).join('')
-          || '<p class="sotto">Nessun telefono collegato. Con il collegamento timbra dal suo telefono, senza e-mail.</p>'}
-        <button class="btn" id="p-tel">${(A.telefoni || []).some(t => t.persona === p.id) ? 'Collega un telefono nuovo' : 'Collega il suo telefono'}</button>` : ''}` : ''}`, f => {
-      const tel = f.querySelector('#p-tel'); if (tel) tel.addEventListener('click', () => collegaTelefono(p));
+        ${p.email && p.id !== A.io.id ? `<p class="sotto">${p.invitato ? 'Accesso mandato: entra con la sua e-mail e sceglie la sua password, poi timbra dal suo telefono.'
+          : 'Manda l’accesso: gli arriva un’e-mail, entra con la sua e-mail, sceglie la password e timbra dal suo telefono.'}</p>` : ''}` : ''}`, f => {
       f.querySelector('#p-salva').addEventListener('click', () => {
         const att = f.querySelector('#p-attivo');
         salvaE('pf_salva_persona', { p: { id: p ? p.id : '', nome: f.querySelector('#p-nome').value, cognome: f.querySelector('#p-cognome').value,
@@ -917,91 +981,10 @@ const PF = (() => {
     });
   }
 
-  /* ------------------------------------ il telefono del dipendente (30/10/2026)
-     Senza e-mail: il titolare crea un collegamento (una volta, 24 ore) e lo
-     mostra come QR o lo manda su WhatsApp; il telefono del dipendente lo apre
-     e riceve una chiave sua (pf-telefono). Da lì: «Entrata» / «Uscita». */
-  let T = null;   // l'area del dipendente sul suo telefono
-  function chiaveTel() { return DEMO ? (chiaveTel.demo || null) : leggi(K_TEL, null); }
-
-  function collegaTelefono(p) {
-    rpc('pf_nuovo_collegamento', { p_persona: p.id }).then(r => {
-      const link = `${INDIRIZZO}#collega=${r.codice}`;
-      const testo = `Ciao ${p.nome}, da oggi segni entrata e uscita dal tuo telefono con l'app Pro Farmer. Apri questo link (vale 24 ore, una volta sola): ${link}`;
-      foglio(`Il telefono di ${p.nome}`, `
-        <p class="sotto">Fai inquadrare questo QR con la fotocamera del suo telefono, oppure mandagli il link su WhatsApp.
-          Vale <b>24 ore e una volta sola</b>; se collega un altro telefono, quello di prima smette di funzionare.</p>
-        <div id="tel-qr" style="background:#fff;border-radius:16px;padding:14px;width:min(260px,100%);align-self:center"></div>
-        <a class="btn" href="https://wa.me/?text=${encodeURIComponent(testo)}" target="_blank" rel="noopener">Manda su WhatsApp</a>
-        <button class="btn sec" id="tel-copia">Copia il link</button>
-        <p class="sotto">Poi, sul suo telefono: «Aggiungi alla schermata Home» (su iPhone da Safari), così l’app si apre con un tocco.</p>`, f => {
-        caricaLib(LIB.qr, 'qrcode').then(qrcode => { const c = qrcode(0, 'M'); c.addData(link); c.make();
-          f.querySelector('#tel-qr').innerHTML = c.createSvgTag({ cellSize: 6, margin: 1, scalable: true }); }).catch(() => {});
-        f.querySelector('#tel-copia').addEventListener('click', () => {
-          (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(() => toast('Link copiato.')).catch(() => prompt('Copia il link:', link));
-        });
-      });
-    }).catch(e => toast(motivo(e)));
-  }
-
-  function collegaQuesto(codice) {
-    app().className = '';
-    app().innerHTML = `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer"><h1>Collego il telefono…</h1></div>`;
-    rpc('pf_collega_telefono', { p_codice: codice, p_dispositivo: navigator.userAgent.slice(0, 200) }).then(r => {
-      if (DEMO) chiaveTel.demo = r.chiave; else scrivi(K_TEL, r.chiave);
-      history.replaceState(null, '', location.pathname + location.search);
-      esito(true, `Ciao ${r.nome}`, `Questo telefono è collegato a ${r.azienda}. Da ora segni entrata e uscita da qui.`, () => caricaTelefono());
-    }).catch(e => {
-      app().innerHTML = `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
-        <h1>Collegamento non riuscito</h1><p class="sotto">${esc(motivo(e))}</p></div>`;
-    });
-  }
-
-  function caricaTelefono(msg) {
-    const k = chiaveTel();
-    return rpc('pf_telefono_area', { p_chiave: k }).then(r => { T = r; disegnaTelefono(msg); }).catch(e => {
-      if (e.delDatabase) {
-        if (!DEMO) scrivi(K_TEL, null);
-        app().innerHTML = `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
-          <h1>Telefono non collegato</h1><p class="sotto">${esc(e.message)}</p></div>`;
-        return;
-      }
-      if (T) disegnaTelefono('Senza rete: vedi i dati di prima; le timbrature restano qui e partono quando torna il segnale.');
-      else app().innerHTML = `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
-        <h1>Senza rete</h1><p class="sotto">Riprova quando torna il segnale.</p><button class="btn pieno" onclick="location.reload()">Riprova</button></div>`;
-    });
-  }
-
-  function disegnaTelefono(msg) {
-    fermaOrologio();
-    const oggi = Conti.oggi(), io = T.io;
-    const dentro = Conti.dentro(T.timbrature, io.id);
-    const coda = leggi(K_CODA, []).filter(c => c.tipo === 'telefono');
-    const turni = Conti.turniDelGiorno(T.turni, io.id, oggi);
-    const f = Conti.foglio(io, T.timbrature, T.assenze, T.azienda, oggi.slice(0, 7));
-    const diOggi = T.timbrature.filter(t => Conti.roma(t.quando).giorno === oggi).sort((a, b) => b.quando.localeCompare(a.quando));
-    const verifica = T.azienda.verifica;
-    app().className = '';
-    app().innerHTML = barraDemo() + `<header class="testa"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer"></header>
-      <main class="corpo" style="padding-bottom:32px">
-        <p class="saluto">Ciao ${esc(io.nome)}</p><p class="sotto">${esc(T.azienda.ragione)}</p>
-        <p class="orologio" id="orologio">${Conti.roma(new Date().toISOString()).ora}</p>
-        <p class="data">${dataLunga(oggi)}</p>
-        ${msg ? `<div class="avviso">${esc(msg)}</div>` : ''}
-        <button class="btn enorme" data-az="tel-timbra" data-verso="${dentro ? 'uscita' : 'entrata'}">${dentro ? 'Uscita · fine lavoro' : 'Entrata · inizio lavoro'}</button>
-        <p class="sotto" style="text-align:center">${verifica === 'posizione' ? 'Quando premi, il telefono dice solo se sei in azienda. Nessun tracciamento.'
-          : verifica === 'qr' ? 'Dopo il tocco inquadra il QR appeso in azienda.' : ''}</p>
-        ${coda.length ? `<div class="avviso">${coda.length === 1 ? 'Una timbratura è salvata' : coda.length + ' timbrature sono salvate'} sul telefono: partono quando torna la rete.</div>` : ''}
-        <div class="scheda"><h2 class="sezione" style="margin:0 0 2px">Oggi</h2>
-          ${diOggi.length ? diOggi.map(t => `<div class="riga"><span>${t.verso === 'entrata' ? 'Entrata' : 'Uscita'}</span><span class="dx">${ora(t.quando)}${AREE[t.area] || ''}</span></div>`).join('')
-            : '<p class="lista-vuota">Ancora niente.</p>'}
-          ${turni.length ? turni.map(t => `<div class="riga"><span>Turno: ${esc(t.mansione)}</span><span class="dx">${t.inizio}–${t.fine}</span></div>`).join('') : ''}</div>
-        <div class="scheda"><div class="riga"><span>Le tue ore di ${MESI[Number(oggi.slice(5, 7)) - 1]}</span><span class="dx">${Conti.hhmm(f.totale.lavoro)}</span></div></div>
-        <p class="sotto">Se hai sbagliato una timbratura, dillo al titolare: la corregge lui. Questo telefono timbra solo per ${esc(io.nome)}.</p>
-      </main>`;
-    avviaOrologio();
-  }
-
+  /* --------------------------- la timbratura dal proprio account (30/10/2026)
+     Il dipendente entra con la sua e-mail e la sua password (lo invita il
+     titolare) e preme «Entrata» / «Uscita». Il controllo lo sceglie il titolare:
+     la posizione solo in quel momento, il QR appeso in azienda o niente. */
   function posizioneOra() {
     if (DEMO) return Promise.resolve({ lat: 45.2, lon: 10.0, precisione: 15 });
     if (!navigator.geolocation) return Promise.resolve(null);
@@ -1011,26 +994,28 @@ const PF = (() => {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }));
   }
 
-  function timbraTelefono(verso, codiceQr) {
-    const v = T.azienda.verifica;
+  function timbraIo(verso, codiceQr) {
+    const v = A.azienda.verifica;
     if (v === 'qr' && !codiceQr) {
-      if (DEMO) return timbraTelefono(verso, PFDemo.codicePunto());
-      return inquadra(c => timbraTelefono(verso, c));
+      if (DEMO) return timbraIo(verso, PFDemo.codicePunto());
+      return inquadra(c => timbraIo(verso, c));
     }
     const quando = new Date().toISOString(), chiave = nuovaChiave();
-    const b = document.querySelector('[data-az="tel-timbra"]'); if (b) { b.disabled = true; b.textContent = v === 'posizione' ? 'Controllo la posizione…' : 'Un attimo…'; }
+    const b = document.querySelector('[data-az="timbra-io"]'); if (b) { b.disabled = true; b.textContent = v === 'posizione' ? 'Controllo la posizione…' : 'Un attimo…'; }
     (v === 'posizione' ? posizioneOra() : Promise.resolve(null)).then(pos => {
-      const args = { p_chiave: chiaveTel(), p_verso: verso, p_ora_telefono: quando, p_chiave_invio: chiave, p_codice_qr: codiceQr || null,
+      const args = { p_verso: verso, p_ora_telefono: quando, p_chiave: chiave, p_codice: codiceQr || null,
         p_lat: pos ? pos.lat : null, p_lon: pos ? pos.lon : null, p_precisione: pos ? pos.precisione : null };
-      rpc('pf_telefono_timbra', args).then(r => {
+      rpc('pf_timbra_io', args).then(r => {
         const nota = r.area === 'fuori' ? ' Risulti fuori dall’area dell’azienda: il titolare lo vede.'
           : r.area === 'nd' ? ' Segnata senza posizione: dai il permesso della posizione all’app.' : '';
-        esito(true, r.verso === 'entrata' ? 'Entrata' : 'Uscita', `${r.gia ? 'Era già segnata alle' : 'Alle'} ${ora(r.quando)}.${nota}`, () => caricaTelefono());
+        esito(true, r.verso === 'entrata' ? 'Entrata' : 'Uscita', `${r.gia ? 'Era già segnata alle' : 'Alle'} ${ora(r.quando)}.${nota}`);
+        aggiorna();
       }).catch(e => {
-        if (e.delDatabase) { esito(false, 'Non segnata', e.message, () => caricaTelefono()); return; }
-        metti({ tipo: 'telefono', args });
-        T.timbrature.push({ id: chiave, persona: T.io.id, verso, quando, modo: 'telefono', valida: true });
-        esito(true, 'Salvata sul telefono', `Sei senza rete: la timbratura delle ${ora(quando)} parte appena torna il segnale.`, () => disegnaTelefono());
+        if (e.delDatabase) { esito(false, 'Non segnata', e.message); disegna(); return; }
+        metti({ tipo: 'io', args });
+        A.timbrature.push({ id: chiave, persona: A.io.id, verso, quando, modo: codiceQr ? 'qr' : 'telefono', valida: true });
+        esito(true, 'Salvata sul telefono', `Sei senza rete: la timbratura delle ${ora(quando)} parte appena torna il segnale.`);
+        disegna();
       });
     });
   }
@@ -1281,6 +1266,8 @@ const PF = (() => {
     },
     'doc-nomina': () => documento(Documenti.nomina(A.azienda), 'La nomina'),
     'doc-informativa': () => documento(Documenti.informativa(A.azienda), 'Informativa per i dipendenti'),
+    'doc-condizioni': ev => { if (ev && ev.preventDefault) ev.preventDefault(); documento(Documenti.condizioni(), 'Condizioni d’uso di Easy'); },
+    ricarica: () => carica(),
     'stampa-doc': () => stampaDoc(documento.ultimo || ''),
     'accetta-nomina': b => {
       const ok = document.getElementById('nomina-ok');
@@ -1291,7 +1278,6 @@ const PF = (() => {
         .catch(e => { b.disabled = false; b.textContent = 'Accetto e comincio'; document.getElementById('nomina-err').textContent = motivo(e); });
     },
     'qr-demo': () => timbraQR(PFDemo.codicePunto()),
-    'riposa-demo': ev => { ev.preventDefault(); toast('Nella app vera si apre Riposa, con il calcolo e la scorta della tua stalla.'); },
     'timbra-per': b => timbraPer(b.dataset.id),
     'timbra-per-ora': () => foglioTimbraPerOra(),
     correggi: b => foglioCorreggi(A.timbrature.find(t => t.id === b.dataset.id)),
@@ -1328,11 +1314,7 @@ const PF = (() => {
         location.hash = '#chiosco'; mostraChiosco();
       }).catch(e => toast(motivo(e)));
     },
-    'tel-timbra': b => timbraTelefono(b.dataset.verso),
-    'togli-telefono': b => {
-      if (!confirm('Scollego questo telefono? Non potrà più timbrare finché non lo ricolleghi.')) return;
-      rpc('pf_togli_telefono', { p_id: b.dataset.id }).then(() => { chiudiFoglio(); aggiorna('Telefono scollegato.'); }).catch(e => toast(motivo(e)));
-    },
+    'timbra-io': b => timbraIo(b.dataset.verso),
     'togli-tablet': b => rpc('pf_togli_dispositivo', { p_id: b.dataset.id }).then(() => aggiorna('Tablet scollegato.')).catch(e => toast(motivo(e))),
     'chiosco-persona': b => pinChiosco(b.dataset.id),
     'chiosco-esci': () => {
@@ -1353,21 +1335,24 @@ const PF = (() => {
   document.addEventListener('change', ev => {
     if (ev.target.id !== 'demo-chi') return;
     const v = ev.target.value;
-    chiaveTel.demo = null; T = null;
     if (v === 'tablet') { location.hash = '#chiosco'; return mostraChiosco(); }
-    if (v === 'telefono') { chiaveTel.demo = 'demo.telefono.p-ion'; location.hash = ''; return caricaTelefono(); }
     PFDemo.diventa(v); location.hash = ''; carica();
   });
   document.addEventListener('click', ev => {
     if (ev.target.id === 'demo-ricomincia') { PFDemo.ricomincia(); PFDemo.diventa('p-marco'); location.hash = ''; carica(); }
   });
 
+  // i link «#collega=» del telefono senza e-mail non valgono più (30/10/2026)
+  function collegamentoVecchio() {
+    history.replaceState(null, '', location.pathname + location.search);
+    mostraAccesso('', 'Il collegamento del telefono senza e-mail non si usa più: chiedi al titolare di mandarti l’accesso alla tua e-mail, poi entra qui.');
+  }
+
   /* ------------------------------------------------------------ partenza */
   window.addEventListener('hashchange', () => {
     const h = location.hash;
     if (h === '#chiosco') return mostraChiosco();
-    const col = h.match(/#collega=([0-9a-z]{6,40})/i);
-    if (col) return collegaQuesto(col[1]);
+    if (/#collega=/.test(h)) return collegamentoVecchio();
     const c = codiceDa(h);
     if (c && A) { history.replaceState(null, '', location.pathname + location.search + '#timbra'); return timbraQR(c); }
     if (A) disegna();
@@ -1375,14 +1360,12 @@ const PF = (() => {
 
   function parti() {
     if ('serviceWorker' in navigator && !DEMO && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
-    const col = location.hash.match(/#collega=([0-9a-z]{6,40})/i);
-    if (col) return collegaQuesto(col[1]);
+    if (/#collega=/.test(location.hash)) return collegamentoVecchio();
     if (location.hash === '#chiosco' || (!DEMO && leggi(K_CHIOSCO, null) && !location.hash)) { location.hash = '#chiosco'; return mostraChiosco(); }
     const qr = codiceDa(location.hash);
     if (DEMO) return carica(() => { disegna(); if (qr) timbraQR(qr); });
     collegamento().auth.getSession().then(({ data }) => {
-      // il telefono di un dipendente collegato senza e-mail
-      if (!data.session && leggi(K_TEL, null)) return caricaTelefono();
+      try { localStorage.removeItem('pf-telefono'); } catch (e) {}   // il vecchio collegamento senza e-mail (fino al 30/10/2026)
       if (!data.session) return mostraAccesso(qr ? 'Entra con la tua e-mail, poi inquadra di nuovo il QR.' : '');
       carica(() => {
         if (qr) { history.replaceState(null, '', location.pathname + '#timbra'); disegna(); timbraQR(qr); } else disegna();

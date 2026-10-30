@@ -1,15 +1,15 @@
 # App Pro Farmer
 
-L'app di Pro Farmer per l'allevatore, su **easy.profarmer.it** (dal novembre 2026).
-Si installa sul telefono come un'app e dentro ci sono:
+**Easy**, l'app di Pro Farmer per le presenze e i turni dei dipendenti delle
+aziende agricole, su **easy.profarmer.it** (dal novembre 2026): timbrature dal
+proprio telefono (con la posizione del momento o col QR appeso in azienda) o
+col tablet di stalla e il PIN, ferie e riposi, turni della settimana, riepilogo
+del mese per il consulente del lavoro, mansionario.
 
-- **Riposa**: il calcolo di piùLact per la stalla, la scorta e il promemoria del
-  riordino. È una copia di riposa.profarmer.it fatta da
-  `strumenti/genera-riposa.mjs` (fuori da questo repository): **`riposa/` non si
-  modifica a mano**.
-- **Presenze e turni**: timbrature col QR appeso in stalla o col tablet di
-  stalla e il PIN, ferie e riposi, turni della settimana, riepilogo del mese per
-  il consulente del lavoro, mansionario. In regalo ai clienti piùLact.
+Chiunque crea l'account; Pro Farmer abilita le aziende clienti piùLact (gratis,
+senza limiti di dipendenti). I dipendenti entrano con l'e-mail e la password, su
+invito del titolare. Riposa è un'app a sé (riposa.profarmer.it): `riposa/` qui
+rimanda solo lì.
 
 `?demo` apre l'app con un'azienda finta tutta nel browser: niente parte verso il
 database.

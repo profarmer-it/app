@@ -8,7 +8,7 @@
    file in assets/ cambiano nome con ?v=. Cambiare CACHE solo per buttare via tutto.
    ========================================================================== */
 
-const CACHE = 'pf-v1';   // i file nuovi arrivano con ?v= in index.html
+const CACHE = 'pf-v2';   // i file nuovi arrivano con ?v= in index.html (v2, 30/10: Riposa è un'app a sé)
 
 self.addEventListener('install', ev => {
   ev.waitUntil((async () => {
@@ -16,7 +16,7 @@ self.addEventListener('install', ev => {
     const pagina = await fetch('./', { cache: 'no-cache' });
     const html = await pagina.clone().text();
     await cache.put('./', pagina);
-    const file = new Set(['manifest.webmanifest', 'assets/logo-bianco.png', 'assets/riposa.png']);
+    const file = new Set(['manifest.webmanifest', 'assets/logo-bianco.png']);
     for (const m of html.matchAll(/(?:href|src)="([^"#:]+)"/g)) file.add(m[1]);
     for (const f of [...file]) {
       if (!/\.css(\?|$)/.test(f)) continue;
@@ -24,17 +24,6 @@ self.addEventListener('install', ev => {
       const base = f.replace(/[^/]*$/, '');
       for (const m of css.matchAll(/url\('?([^')]+)'?\)/g)) file.add(base + m[1]);
     }
-    // Riposa dentro l'app (riposa/, copiata da genera-riposa.mjs): il calcolo va anche senza rete
-    try {
-      const rp = await fetch('riposa/', { cache: 'no-cache' });
-      const rh = await rp.clone().text();
-      await cache.put('riposa/', rp);
-      for (const m of rh.matchAll(/(?:href|src)="([^"#:]+)"/g)) {
-        if (!m[1].startsWith('../')) file.add('riposa/' + m[1]);
-      }
-      for (const f of ['400', '600']) file.add(`riposa/assets/font/fraunces-${f}.woff2`);
-      for (const f of ['400', '500', '600']) file.add(`riposa/assets/font/inter-${f}.woff2`);
-    } catch (e) { /* senza Riposa l'app va lo stesso */ }
     await Promise.all([...file].map(f => cache.add(f).catch(() => null)));
     await self.skipWaiting();
   })());
@@ -56,11 +45,11 @@ self.addEventListener('fetch', ev => {
   if (url.origin !== location.origin && !cdn) return;
 
   if (req.mode === 'navigate') {
-    const pagina = url.pathname.startsWith('/riposa') ? 'riposa/' : './';
+    const pagina = './';
     ev.respondWith((async () => {
       try {
         const r = await fetch(req);
-        if (r.ok && /^\/(riposa\/?)?(index\.html)?$/.test(url.pathname)) (await caches.open(CACHE)).put(pagina, r.clone());
+        if (r.ok && /^\/(index\.html)?$/.test(url.pathname)) (await caches.open(CACHE)).put(pagina, r.clone());
         return r;
       } catch (e) {
         return (await caches.match(req)) || (await caches.match(pagina));

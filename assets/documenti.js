@@ -14,7 +14,8 @@
    ========================================================================== */
 
 const Documenti = (() => {
-  const VERSIONE = 'nomina-2026-11-v2';   // v2 (30/10): il telefono collegato del dipendente
+  const VERSIONE = 'nomina-2026-11-v3';   // v3 (30/10): il dipendente timbra dal suo account, niente telefono collegato
+  const CONDIZIONI = 'condizioni-easy-2026-11-v1';
   const PF = 'Pro Farmer S.r.l.s., Via Milazzo 19, 26100 Cremona (CR), P.IVA 01797050190, info@profarmer.it';
   const e = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -47,8 +48,7 @@ e non li usa per finalità proprie, commerciali o di profilazione.</p>
 <h3>3. Interessati e dati</h3>
 <p>Interessati: i dipendenti e i collaboratori che il Titolare inserisce nell’app, e il Titolare stesso.
 Dati: nome e cognome, indirizzo e-mail (facoltativo), orario di contratto, PIN personale (conservato solo in forma non leggibile),
-orari di entrata e uscita, assenze e relativo tipo, turni, compiti, correzioni con il loro motivo; un identificativo del telefono
-collegato dal dipendente; se il Titolare sceglie il controllo della posizione, l’indicazione «dentro», «fuori» o «senza posizione»
+orari di entrata e uscita, assenze e relativo tipo, turni, compiti, correzioni con il loro motivo; se il Titolare sceglie il controllo della posizione, l’indicazione «dentro», «fuori» o «senza posizione»
 rispetto all’area dell’azienda al momento della timbratura (le coordinate non vengono conservate).
 <b>Non si trattano dati biometrici</b> e non si traccia la posizione in continuo. La malattia è indicata solo come tipo di assenza, senza diagnosi.</p>
 
@@ -109,15 +109,15 @@ ${e(PF)} tratta i dati <b>per conto dell’azienda</b>, come responsabile del tr
 L’app è uno strumento di registrazione degli accessi e delle presenze ai sensi dell’art. 4, comma 2, della legge 300/1970: <b>non serve a controllare a distanza l’attività lavorativa</b>.</p>
 
 <h3>Quali dati</h3>
-<p>Nome e cognome; e-mail, se ti è stato dato l’accesso all’app; orario di contratto; PIN personale per il tablet (conservato in forma non leggibile);
+<p>Nome e cognome; e-mail, se ti è stato dato l’accesso all’app (la password la scegli tu e nessuno la vede); orario di contratto; PIN personale per il tablet (conservato in forma non leggibile);
 orari di entrata e uscita; assenze e loro tipo (senza diagnosi); turni e compiti; eventuali correzioni del titolare con il motivo.</p>
 <ul>
 <li><b>Niente dati biometrici</b> (impronte, volto).</li>
 <li><b>Niente posizione in continuo.</b> ${az && (az.verifica || 'posizione') === 'posizione'
   ? 'Quando timbri dal telefono, solo in quel momento il telefono indica se sei dentro o fuori dall’area dell’azienda: si conserva solo questo esito, mai le coordinate. Se non dai il permesso della posizione la timbratura vale lo stesso, segnata «senza posizione».'
   : 'La posizione del telefono non viene usata.'}</li>
-<li>Timbri dal tuo telefono (collegato una volta dal titolare, senza e-mail)${az && az.verifica === 'qr' ? ' inquadrando il QR appeso in azienda' : ''}, oppure sul tablet aziendale con il tuo PIN.
-Il collegamento e il PIN sono personali: non timbrare per i colleghi e non farlo fare a loro per te.</li>
+<li>Timbri dal tuo telefono, entrando nell’app con la tua e-mail e la tua password${az && az.verifica === 'qr' ? ' e inquadrando il QR appeso in azienda' : ''}, oppure sul tablet aziendale con il tuo PIN.
+Password e PIN sono personali: non darli ai colleghi, non timbrare per loro e non farlo fare a loro per te.</li>
 </ul>
 
 <h3>Chi li vede</h3>
@@ -138,5 +138,37 @@ Garante per la protezione dei dati personali (garanteprivacy.it).</p>
 <p class="doc-firma">Data ____________ &nbsp;&nbsp; Firma del dipendente per presa visione ________________________________</p>`;
   }
 
-  return { VERSIONE, nomina, informativa };
+  /* Le condizioni d'uso di Easy (30/10/2026): chi chiede l'attivazione le
+     accetta con una spunta; il database registra la versione (40). */
+  function condizioni() {
+    return `
+<h2>Condizioni d’uso di Easy</h2>
+<p class="doc-nota">Versione ${CONDIZIONI} · BOZZA da far rileggere a un legale</p>
+<h3>1. Chi fornisce Easy</h3>
+<p>Easy (easy.profarmer.it) è l’app per le presenze e i turni dei dipendenti delle aziende agricole, fornita da ${e(PF)} («Pro Farmer»).</p>
+<h3>2. Chi può usarla</h3>
+<p>Chiunque può creare un account. Easy si attiva per un’azienda solo dopo che Pro Farmer ha verificato che è cliente piùLact:
+per i clienti piùLact è gratuita e senza limiti di dipendenti. Pro Farmer può rifiutare una richiesta, dicendone il motivo.
+Chi chiede l’attivazione dichiara di poter agire per l’azienda (titolare o legale rappresentante).</p>
+<h3>3. L’account</h3>
+<p>E-mail e password sono personali. Il titolare invita i suoi dipendenti con la loro e-mail e risponde dell’uso che l’azienda fa dell’app.
+Ognuno timbra solo per sé.</p>
+<h3>4. I dati dei dipendenti</h3>
+<p>L’azienda è titolare dei dati dei suoi dipendenti; Pro Farmer li tratta per suo conto come responsabile del trattamento,
+secondo la nomina che il titolare accetta nell’app prima di cominciare. L’azienda dà ai dipendenti l’informativa (il modello è nell’app)
+e verifica con il suo consulente del lavoro che l’uso dell’app sia conforme alle norme sul lavoro.</p>
+<h3>5. Il servizio</h3>
+<p>Pro Farmer cura che Easy funzioni, ma non garantisce che sia sempre disponibile o senza errori. Il riepilogo del mese è un aiuto:
+le paghe le controlla il consulente del lavoro. Senza rete le timbrature restano sul telefono e partono quando torna il segnale.</p>
+<h3>6. Gratuità e cambiamenti</h3>
+<p>Per i clienti piùLact Easy è gratuita. Se un’azienda smette di essere cliente piùLact, o se Pro Farmer cambia queste condizioni,
+lo comunica con almeno 30 giorni di anticipo: l’azienda può esportare i suoi dati in ogni momento.</p>
+<h3>7. Fine dell’uso</h3>
+<p>Il titolare può smettere quando vuole scrivendo a info@profarmer.it; Pro Farmer può sospendere un account usato in modo scorretto.
+Alla fine i dati si possono esportare per 30 giorni, poi si cancellano come previsto dalla nomina.</p>
+<h3>8. Legge e foro</h3>
+<p>Valgono la legge italiana e, per le aziende, il foro di Cremona.</p>`;
+  }
+
+  return { VERSIONE, CONDIZIONI, nomina, informativa, condizioni };
 })();
