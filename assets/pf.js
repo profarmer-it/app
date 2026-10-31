@@ -173,7 +173,7 @@ const PF = (() => {
   function chiediCodice(e, el, crea) {
     if (el) { el.style.pointerEvents = 'none'; el.textContent = 'Mando il codice…'; }
     const torna = crea ? mostraCrea : mostraAccesso;
-    Antirobot.token().then(captchaToken => collegamento().auth.signInWithOtp({ email: e, options: { shouldCreateUser: !!crea, data: crea ? { app: 'pf' } : undefined, captchaToken } })).then(({ error }) => {
+    Antirobot.token().then(captchaToken => collegamento().auth.signInWithOtp({ email: e, options: { shouldCreateUser: !!crea, data: crea ? { app: 'pf' } : undefined, emailRedirectTo: 'https://easy.profarmer.it/', captchaToken } })).then(({ error }) => {
       if (!error) return mostraCodice();
       const m = String(error.message || '');
       if (Antirobot.errore(error)) return torna('Il controllo anti-robot non è riuscito: ricarica la pagina e riprova.');
