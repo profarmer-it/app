@@ -120,10 +120,10 @@ h2.sezione{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacin
 /* moduli e fogli */
 .campo{display:flex;flex-direction:column;gap:6px}
 .campo label{font-size:13.5px;font-weight:600;color:var(--testo-2)}
-.campo input,.campo select,.campo textarea{background:var(--fondo);border:1.5px solid var(--bordo);border-radius:12px;padding:12px;
+.campo input,.campo select,.campo textarea,.tipo-riga .orari input,.nome-riga select,.spunta-nota .nota{background:var(--fondo);border:1.5px solid var(--bordo);border-radius:12px;padding:12px;
   font-size:16px;min-height:48px;width:100%}
 .campo textarea{min-height:110px;resize:vertical}
-.campo input:focus,.campo select:focus,.campo textarea:focus{border-color:var(--arancio);outline:0}
+.campo input:focus,.campo select:focus,.campo textarea:focus,.tipo-riga .orari input:focus,.nome-riga select:focus,.spunta-nota .nota:focus{border-color:var(--arancio);outline:0}
 .campo-pw{position:relative;display:flex}
 .campo-pw input{flex:1;padding-right:96px;min-width:0}
 .mostra-pw{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--arancio);font:inherit;font-size:14px;font-weight:700;padding:8px 10px;cursor:pointer}
@@ -236,3 +236,31 @@ a.btn{text-decoration:none}
 .cruscotto .cifra.forte span{color:var(--inchiostro)}
 .tab-tabella tr.totale td{border-top:2px solid var(--bordo)}
 @media (max-width:520px){.cruscotto{grid-template-columns:1fr 1fr}.cruscotto .cifra.forte{grid-column:1 / -1;order:-1}}
+
+/* la settimana a griglia, come il foglio Excel (31/10/2026) */
+.griglia{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--bordo);border-radius:var(--raggio);background:var(--fondo-2)}
+.griglia table{border-collapse:separate;border-spacing:0;min-width:860px;width:100%}
+.griglia th,.griglia td{border-bottom:1px solid var(--bordo);vertical-align:top;padding:0}
+.griglia thead th{font-size:13px;font-weight:800;padding:10px 6px;text-align:left;color:var(--testo-2);position:sticky;top:0;background:var(--fondo-2)}
+.griglia thead th.oggi{color:var(--arancio)}
+.griglia tbody th{position:sticky;left:0;background:var(--fondo-2);text-align:left;padding:8px 10px;width:150px;min-width:150px;z-index:1;border-right:1px solid var(--bordo)}
+.griglia tbody th b{display:block;font-size:13px;line-height:1.25}
+.griglia tbody th small{display:block;font-size:12px;color:var(--testo-3);font-weight:600;font-variant-numeric:tabular-nums}
+.griglia tr.area th{background:var(--fondo-3);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--testo-2);padding:6px 10px}
+.griglia .cella{display:flex;flex-direction:column;gap:2px;width:100%;min-height:52px;padding:8px 6px;text-align:left;background:none;border:0;color:var(--testo);font:inherit;font-size:13px;cursor:pointer}
+.griglia .cella:hover{background:var(--fondo-3)}
+.griglia .cella small{color:var(--testo-3);font-size:11px}
+.griglia .cella .vuota{color:var(--testo-3)}
+.griglia tr.festa th,.griglia tr.festa td{background:rgba(247,148,29,.08)}
+.griglia tr.lavori .cella .lav{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:12px;color:var(--testo-2);border-bottom:1px dashed var(--bordo);padding-bottom:3px}
+.avvisi-sett{background:rgba(255,122,107,.08);border:1px solid rgba(255,122,107,.35);border-radius:var(--raggio);padding:10px 14px}
+.avvisi-sett summary{cursor:pointer}
+.avvisi-sett ul{margin:8px 0 4px;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.tipo-riga .orari{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px}
+.tipo-riga .orari input{width:auto;min-width:0;flex:0 1 128px;padding:8px 10px;color-scheme:dark}
+.tipo-riga .orari span{color:var(--testo-3);font-size:13px}
+.nome-riga select{max-width:62%;padding:8px 10px}
+.lista-spunte{display:flex;flex-direction:column;gap:6px}
+.spunta-nota{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.spunta-nota .nota{flex:0 1 45%;min-width:0;padding:6px 8px;font-size:14px}
+.lavoro{font-size:14px;color:var(--testo-2);border-left:3px solid var(--arancio);padding:2px 0 2px 10px;margin:6px 0;white-space:pre-line}

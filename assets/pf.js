@@ -422,7 +422,7 @@ const PF = (() => {
     const daDecidere = titolare() ? A.assenze.filter(a => a.stato === 'chiesta').length : 0;
     const titolo = { home: '', oggi: 'Oggi', turni: 'Turni', ferie: 'Ferie e riposi', mese: 'Cruscotto del mese', altro: 'Impostazioni',
       timbra: '', compiti: 'Compiti', profilo: 'Profilo' }[v];
-    app().className = v === 'mese' ? 'largo' : '';
+    app().className = v === 'mese' || (v === 'turni' && titolare() && (A.tipi || []).length) ? 'largo' : '';
     if (!A.attiva) {
       app().innerHTML = barraDemo() + `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
         <h1>Presenze e turni è in pausa</h1><p class="sotto">Per la tua azienda l'app non è attiva in questo momento.
@@ -555,8 +555,10 @@ const PF = (() => {
       ${coda.length ? `<div class="avviso">${coda.length === 1 ? 'Una timbratura è salvata' : coda.length + ' timbrature sono salvate'} sul telefono:
         partono da sole quando torna la rete.</div>` : ''}
       <div class="scheda"><h2 class="sezione" style="margin:0 0 2px">Il tuo turno di oggi</h2>
-        ${turni.length ? turni.map(t => `<div class="riga"><span>${esc(t.mansione)}</span><span class="dx">${t.inizio}–${t.fine}</span></div>`).join('')
+        ${turni.length ? turni.map(t => `<div class="riga"><span>${esc(t.mansione)}${t.nota ? ` <small class="sotto">${esc(t.nota)}</small>` : ''}</span><span class="dx">${t.inizio}–${t.fine}</span></div>`).join('')
           : '<p class="lista-vuota">Oggi non hai turni.</p>'}</div>
+      ${(A.lavori || []).some(l => l.giorno === oggi) ? `<div class="scheda"><h2 class="sezione" style="margin:0 0 2px">I lavori di oggi</h2>
+        ${(A.lavori || []).filter(l => l.giorno === oggi).map(l => `<p class="lavoro">${esc(l.testo)}</p>`).join('')}</div>` : ''}
       <div class="scheda"><div class="riga"><span>Ultima timbratura</span><span class="dx">${u
         ? `${Conti.roma(u.quando).giorno === oggi ? 'oggi' : dataIt(Conti.roma(u.quando).giorno)}, ${u.verso} ${ora(u.quando)}` : '—'}</span></div>
         <div class="riga"><span>Le tue ore di ${MESI[Number(oggi.slice(5, 7)) - 1]}</span><span class="dx">${Conti.hhmm(f.totale.lavoro)}</span></div></div>
@@ -688,14 +690,258 @@ const PF = (() => {
   setInterval(() => svuotaCoda(), 60000);
 
   /* ---------------------------------------------------------------- turni */
+  /* ------------------------------------------------ la settimana a griglia
+     Dal 31/10/2026, come il foglio «Organizzazione lavoro» di Giulio: una riga
+     per turno-tipo (raggruppati per stalla), una colonna per giorno, più
+     persone per casella; la riga Festa (riposi); i lavori del giorno; gli
+     avvisi (Settimana.avvisi) e le ore di ognuno. Si riempie dall'Excel, a mano
+     casella per casella, o copiando la settimana prima. */
+  const giorniSett = () => Array.from({ length: 7 }, (_, i) => Conti.piuGiorni(settimana, i));
+  const orarioTipo = y => `${y.inizio}–${y.fine}${y.inizio2 ? ` e ${y.inizio2}–${y.fine2}` : ''}`;
+  function riposoDel(pid, g) {
+    return A.assenze.find(a => a.persona === pid && a.stato === 'approvata' && a.tipo === 'riposo' && g >= a.dal && g <= a.al);
+  }
+  function inCella(tipoId, g) {
+    const visti = new Map();
+    A.turni.filter(u => u.tipo === tipoId && u.giorno === g).forEach(u => { if (!visti.has(u.persona)) visti.set(u.persona, u.nota || ''); });
+    return [...visti].map(([id, nota]) => ({ id, nota }));
+  }
+  function collegati() {
+    const c = { ...(A.alias || {}) };
+    A.persone.forEach(p => { const k = Settimana.chiaveNome(p.nome); if (k && !c[k]) c[k] = p.id; });
+    return c;
+  }
+  function avvisiSettimana(g7) {
+    const dip = A.persone.filter(p => p.attivo !== false && p.ruolo === 'dipendente');
+    const turni = A.turni.filter(u => u.tipo && g7.includes(u.giorno));
+    const riposi = {};
+    dip.forEach(p => { riposi[p.id] = new Set(g7.filter(g => assenzaDel(p.id, g))); });
+    return Settimana.avvisi({ giorni: g7, turni, riposi, persone: dip, tipi: A.tipi });
+  }
+  function vSettimana() {
+    const g7 = giorniSett(), oggi = Conti.oggi();
+    const pubblicata = A.settimane.includes(settimana);
+    const aree = [...new Set(A.tipi.map(y => y.area || ''))];
+    const vuota = !A.turni.some(u => u.tipo && g7.includes(u.giorno));
+    const { avvisi, ore } = avvisiSettimana(g7);
+    const nomeCorto = id => esc((persona(id) || {}).nome || '?');
+    const cellaHtml = (y, g) => {
+      const cc = inCella(y.id, g);
+      return `<td><button class="cella" data-az="cella" data-tipo="${y.id}" data-giorno="${g}" aria-label="${esc(y.nome)}, ${GIORNI[Conti.giornoSettimana(g)]}">
+        ${cc.length ? cc.map(x => `<span>${nomeCorto(x.id)}${x.nota ? ` <small>${esc(x.nota)}</small>` : ''}</span>`).join('') : '<span class="vuota">+</span>'}</button></td>`;
+    };
+    const lavori = g => (A.lavori || []).filter(l => l.giorno === g);
+    const oreRighe = Object.entries(ore).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+    return `<div class="navsett"><button data-az="sett" data-n="-7" aria-label="Settimana prima">‹</button>
+        <b>${dataIt(g7[0])} – ${dataIt(g7[6])}</b><button data-az="sett" data-n="7" aria-label="Settimana dopo">›</button></div>
+      <div class="riga-bottoni"><button class="btn" data-az="importa">Importa dal foglio Excel</button>
+        ${vuota ? '<button class="btn sec" data-az="copia-sett">Copia la settimana prima</button>' : ''}
+        <button class="btn ${pubblicata ? 'chiaro' : 'sec'}" data-az="pubblica">${pubblicata ? 'Pubblicata · avvisa di nuovo' : 'Pubblica e avvisa'}</button>
+        <button class="btn chiaro" data-az="tipi">I turni</button></div>
+      ${avvisi.length ? `<details class="avvisi-sett"${avvisi.length <= 6 ? ' open' : ''}><summary><b>${avvisi.length} ${avvisi.length === 1 ? 'cosa da guardare' : 'cose da guardare'}</b> prima di pubblicare</summary>
+        <ul>${avvisi.map(a => `<li>${esc(a.testo)}</li>`).join('')}</ul>
+        <p class="sotto">Le regole sul riposo dipendono dal contratto: in caso di dubbio chiedi al consulente del lavoro.</p></details>`
+        : (vuota ? '' : '<p class="sotto">Nessun problema trovato: ognuno ha un riposo, niente turni sovrapposti, almeno 11 ore di riposo di fila.</p>')}
+      <div class="griglia"><table>
+        <thead><tr><th></th>${g7.map(g => `<th class="${g === oggi ? 'oggi' : ''}">${GIORNI[Conti.giornoSettimana(g)].slice(0, 3)} ${g.slice(8)}</th>`).join('')}</tr></thead>
+        <tbody>${aree.map(ar => `${ar ? `<tr class="area"><th colspan="8">${esc(ar)}</th></tr>` : ''}
+          ${A.tipi.filter(y => (y.area || '') === ar).map(y => `<tr><th><b>${esc(y.nome)}</b><small>${orarioTipo(y)}</small></th>${g7.map(g => cellaHtml(y, g)).join('')}</tr>`).join('')}`).join('')}
+          <tr class="festa"><th><b>Festa</b><small>riposo</small></th>${g7.map(g => {
+            const chi = A.persone.filter(p => riposoDel(p.id, g));
+            return `<td><button class="cella" data-az="cella" data-tipo="" data-giorno="${g}" aria-label="Festa, ${GIORNI[Conti.giornoSettimana(g)]}">
+              ${chi.length ? chi.map(p => `<span>${esc(p.nome)}</span>`).join('') : '<span class="vuota">+</span>'}</button></td>`;
+          }).join('')}</tr>
+          <tr class="lavori"><th><b>Lavori</b><small>del giorno</small></th>${g7.map(g => `<td><button class="cella" data-az="lavori" data-giorno="${g}">
+            ${lavori(g).length ? lavori(g).map(l => `<span class="lav">${esc(l.testo)}</span>`).join('') : '<span class="vuota">+</span>'}</button></td>`).join('')}</tr>
+        </tbody></table></div>
+      ${oreRighe.length ? `<h2 class="sezione">Ore di turno della settimana</h2>
+        <div class="scheda ore-sett">${oreRighe.map(([id, n]) => `<div class="riga"><span>${nomeCorto(id)}</span><span class="dx"${n > 48 ? ' style="color:var(--rosso);font-weight:700"' : ''}>${Conti.hhmm(n)}</span></div>`).join('')}</div>` : ''}
+      <p class="sotto">Tocca una casella per cambiare chi c'è. «Pubblica e avvisa» manda a ognuno i suoi turni e i suoi lavori.</p>`;
+  }
+  function foglioCella(tipoId, g) {
+    const y = tipoId ? A.tipi.find(t => t.id === tipoId) : null;
+    const dentro = new Map(y ? inCella(y.id, g).map(x => [x.id, x.nota]) : A.persone.filter(p => riposoDel(p.id, g)).map(p => [p.id, '']));
+    const persone = A.persone.filter(p => p.attivo !== false && p.ruolo === 'dipendente');
+    foglio(`${y ? y.nome : 'Festa'} · ${GIORNI[Conti.giornoSettimana(g)]} ${dataIt(g)}`, `
+      ${y ? `<p class="sotto">${orarioTipo(y)}${y.area ? ' · ' + esc(y.area) : ''}</p>` : '<p class="sotto">Chi riposa questo giorno: conta come riposo nel cruscotto.</p>'}
+      <div class="lista-spunte">${persone.map(p => `<div class="spunta-nota"><label class="spunta"><input type="checkbox" value="${p.id}"${dentro.has(p.id) ? ' checked' : ''}> <span>${esc(nome(p))}</span></label>
+        ${y ? `<input class="nota" data-per="${p.id}" placeholder="nota" value="${esc(dentro.get(p.id) || '')}" aria-label="Nota per ${esc(p.nome)}">` : ''}</div>`).join('')}</div>
+      <p class="errore" id="c-err"></p><button class="btn pieno" id="c-salva">Salva</button>`, f => {
+      f.querySelector('#c-salva').addEventListener('click', () => {
+        const scelti = [...f.querySelectorAll('input[type=checkbox]:checked')].map(c => ({ id: c.value,
+          nota: y ? (f.querySelector(`.nota[data-per="${c.value}"]`) || {}).value || '' : '' }));
+        salvaE('pf_salva_cella', { p: { giorno: g, tipo: tipoId || '', persone: scelti } }, 'Salvato.', f);
+      });
+    });
+  }
+  function foglioLavori(g) {
+    const ll = (A.lavori || []).filter(l => l.giorno === g);
+    foglio(`Lavori · ${GIORNI[Conti.giornoSettimana(g)]} ${dataIt(g)}`, `
+      <p class="sotto">Ognuno vede i lavori dove c'è il suo nome; quelli senza nomi li vedono tutti.</p>
+      ${ll.map(l => `<div class="campo"><textarea data-id="${l.id}" rows="3">${esc(l.testo)}</textarea></div>`).join('')}
+      <div class="campo"><label for="l-nuovo">Un lavoro nuovo</label><textarea id="l-nuovo" rows="3" placeholder="Amrik e Jassmeet: cuccette gruppo 32"></textarea></div>
+      <p class="errore" id="l-err"></p><button class="btn pieno" id="l-salva">Salva</button>`, f => {
+      f.querySelector('#l-salva').addEventListener('click', async () => {
+        const c = collegati();
+        try {
+          for (const t of f.querySelectorAll('textarea[data-id]')) {
+            const vecchio = ll.find(l => l.id === t.dataset.id);
+            if (vecchio && vecchio.testo !== t.value) await rpc('pf_salva_lavoro', { p: { id: t.dataset.id, testo: t.value, persone: Settimana.nominate(t.value, c) } });
+          }
+          const n = f.querySelector('#l-nuovo').value;
+          if (n.trim()) await rpc('pf_salva_lavoro', { p: { giorno: g, testo: n, persone: Settimana.nominate(n, c) } });
+          chiudiFoglio(); aggiorna('Salvato.');
+        } catch (e) { f.querySelector('#l-err').textContent = motivo(e); }
+      });
+    });
+  }
+  function foglioTipi() {
+    foglio('I turni', `<p class="sotto">I turni-tipo della settimana: nome, stalla e orario. L'orario vale per i turni messi da qui in avanti.</p>
+      ${A.tipi.map(y => `<div class="scheda tipo-riga" data-id="${y.id}">
+        <div class="due"><div class="campo"><label>Nome</label><input data-k="nome" value="${esc(y.nome)}"></div>
+          <div class="campo"><label>Stalla</label><input data-k="area" value="${esc(y.area || '')}"></div></div>
+        <div class="orari"><input type="time" data-k="inizio" value="${y.inizio}" aria-label="Inizio"><span>–</span><input type="time" data-k="fine" value="${y.fine}" aria-label="Fine">
+          <span>e poi</span><input type="time" data-k="inizio2" value="${y.inizio2 || ''}" aria-label="Inizio dopo la pausa"><span>–</span><input type="time" data-k="fine2" value="${y.fine2 || ''}" aria-label="Fine dopo la pausa"></div>
+        <label class="spunta"><input type="checkbox" data-k="togli"> <span>Non lo uso più</span></label></div>`).join('') || '<p class="lista-vuota">Ancora nessun turno: importa il foglio Excel.</p>'}
+      <p class="errore" id="t-err"></p><button class="btn pieno" id="t-salva">Salva</button>`, f => {
+      f.querySelector('#t-salva').addEventListener('click', async () => {
+        try {
+          for (const r of f.querySelectorAll('.tipo-riga')) {
+            const v = k => r.querySelector(`[data-k="${k}"]`);
+            await rpc('pf_salva_tipo', { p: { id: r.dataset.id, nome: v('nome').value, area: v('area').value, inizio: v('inizio').value, fine: v('fine').value,
+              inizio2: v('inizio2').value, fine2: v('fine2').value, attivo: !v('togli').checked } });
+          }
+          chiudiFoglio(); aggiorna('Turni salvati.');
+        } catch (e) { f.querySelector('#t-err').textContent = motivo(e); }
+      });
+    });
+  }
+
+  /* L'Excel della settimana: si legge sul telefono (SheetJS), si collegano
+     turni e nomi a quelli di Easy, si controlla, poi pf_salva_settimana. */
+  function apriImporta() {
+    foglio('Importa la settimana dal foglio Excel', `
+      <p class="sotto">Scegli il file della settimana, per esempio «Organizzazione lavoro stalla nuova e vecchia». Easy legge il foglio con le date in alto:
+        i turni con i nomi, la riga Festa e i lavori del giorno. Prima di salvare ti fa controllare tutto.</p>
+      <div class="campo"><label for="x-file">Il file Excel</label><input id="x-file" type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
+      <div id="x-fogli"></div><div id="x-passo"></div><p class="errore" id="x-err"></p>`, f => {
+      const err = m => { f.querySelector('#x-err').textContent = m || ''; };
+      f.querySelector('#x-file').addEventListener('change', ev => {
+        const file = ev.target.files[0]; if (!file) return;
+        err(''); f.querySelector('#x-passo').innerHTML = '<p class="lista-vuota">Leggo il foglio…</p>';
+        Promise.all([caricaLib('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', 'XLSX'), file.arrayBuffer()]).then(([X, buf]) => {
+          const wb = X.read(buf, { cellDates: true });
+          const scegli = nomeFoglio => {
+            try {
+              const rows = X.utils.sheet_to_json(wb.Sheets[nomeFoglio], { header: 1, raw: true, defval: '' });
+              passoControllo(f, Settimana.leggi(rows));
+              err('');
+            } catch (e) { f.querySelector('#x-passo').innerHTML = ''; err(e.message); }
+          };
+          f.querySelector('#x-fogli').innerHTML = wb.SheetNames.length > 1 ? `<div class="campo"><label for="x-foglio">Il foglio</label>
+            <select id="x-foglio">${wb.SheetNames.map(n => `<option>${esc(n)}</option>`).join('')}</select></div>` : '';
+          const sel = f.querySelector('#x-foglio');
+          if (sel) sel.addEventListener('change', () => scegli(sel.value));
+          scegli(wb.SheetNames[0]);
+        }).catch(e => { f.querySelector('#x-passo').innerHTML = ''; err(e.message || 'Non riesco a leggere il file.'); });
+      });
+    });
+  }
+  function passoControllo(f, L) {
+    const lunedi = Conti.lunediDi(L.giorni[0]);
+    const chiave = y => Settimana.chiaveNome((y.area || '') + '|' + y.nome);
+    const esistenti = new Map(A.tipi.map(y => [chiave(y), y]));
+    const c = collegati();
+    const dip = A.persone.filter(p => p.attivo !== false);
+    const opzioni = n => `<option value="">Non è in Easy: salta</option><option value="nuovo"${c[Settimana.chiaveNome(n)] ? '' : ' selected'}>Nuova persona «${esc(n)}»</option>`
+      + dip.map(p => `<option value="${p.id}"${c[Settimana.chiaveNome(n)] === p.id ? ' selected' : ''}>${esc(nome(p))}</option>`).join('');
+    const nLavori = L.lavori.reduce((n, l) => n + l.length, 0);
+    f.querySelector('#x-passo').innerHTML = `
+      <div class="avviso">Settimana dal ${dataIt(lunedi)} al ${dataIt(Conti.piuGiorni(lunedi, 6))}${L.giorni[0] !== lunedi ? ' (nel foglio il primo giorno non è un lunedì: controlla le date)' : ''}.
+        Salvando, i turni del foglio, le feste e i lavori di quella settimana prendono il posto di quelli che ci sono in Easy.</div>
+      <h3 class="sezione">I turni del foglio (${L.turni.length})</h3>
+      ${L.turni.map((t, i) => { const y = esistenti.get(t.chiave);
+        const o = y || t;
+        return `<div class="scheda tipo-riga" data-i="${i}">
+          <b>${esc(t.nome)}</b>${t.area ? ` <span class="sotto">· ${esc(t.area)}</span>` : ''}${y ? ' <span class="chip verde">già in Easy</span>' : ' <span class="chip">nuovo</span>'}
+          <div class="orari"><input type="time" data-k="inizio" value="${o.inizio || ''}" aria-label="Inizio"><span>–</span><input type="time" data-k="fine" value="${o.fine || ''}" aria-label="Fine">
+            <span>e poi</span><input type="time" data-k="inizio2" value="${o.inizio2 || ''}" aria-label="Inizio dopo la pausa"><span>–</span><input type="time" data-k="fine2" value="${o.fine2 || ''}" aria-label="Fine dopo la pausa"></div>
+          ${!y && t.dubbio ? `<p class="sotto" style="color:var(--arancio-2)">${esc(t.dubbio)}</p>` : ''}</div>`; }).join('')}
+      <h3 class="sezione">I nomi del foglio (${L.nomi.length})</h3>
+      <p class="sotto">Collega ogni nome a una persona di Easy. Easy se lo ricorda per le settimane dopo.</p>
+      <div class="scheda">${L.nomi.map(n => `<div class="riga nome-riga"><span><b>${esc(n)}</b></span><select data-nome="${esc(n)}" aria-label="Chi è ${esc(n)}">${opzioni(n)}</select></div>`).join('')}</div>
+      <p class="sotto">E poi ${L.feste.reduce((n, x) => n + x.length, 0)} feste e ${nLavori} lavori del giorno.</p>
+      <div id="x-avvisi"></div>
+      <button class="btn pieno" id="x-salva">Salva la settimana in Easy</button>`;
+    const leggiScelte = () => {
+      const orari = L.turni.map((t, i) => { const r = f.querySelector(`.tipo-riga[data-i="${i}"]`); const v = k => r.querySelector(`[data-k="${k}"]`).value;
+        return { inizio: v('inizio'), fine: v('fine'), inizio2: v('inizio2'), fine2: v('fine2') }; });
+      const chi = {}; f.querySelectorAll('select[data-nome]').forEach(s => { chi[s.dataset.nome] = s.value; });
+      return { orari, chi };
+    };
+    // gli avvisi con le scelte di adesso (le persone nuove con un id finto)
+    const controlla = () => {
+      const { orari, chi } = leggiScelte();
+      const idDi = n => chi[n] === 'nuovo' ? 'nuovo:' + n : chi[n];
+      const persone = L.nomi.filter(n => chi[n]).map(n => ({ id: idDi(n), nome: n }));
+      const turni = [];
+      L.turni.forEach((t, i) => { const o = orari[i]; if (!o.inizio || !o.fine) return;
+        t.celle.forEach((cc, gi) => cc.forEach(x => { if (!chi[x.nome]) return;
+          turni.push({ persona: idDi(x.nome), giorno: L.giorni[gi], inizio: o.inizio, fine: o.fine, mansione: t.nome, tipo: 't' + i });
+          if (o.inizio2 && o.fine2) turni.push({ persona: idDi(x.nome), giorno: L.giorni[gi], inizio: o.inizio2, fine: o.fine2, mansione: t.nome, tipo: 't' + i });
+        })); });
+      const riposi = {}; L.feste.forEach((ff, gi) => ff.forEach(n => { if (chi[n]) (riposi[idDi(n)] = riposi[idDi(n)] || new Set()).add(L.giorni[gi]); }));
+      const { avvisi } = Settimana.avvisi({ giorni: L.giorni, turni, riposi, persone, tipi: L.turni.map((t, i) => ({ id: 't' + i, nome: t.nome })) });
+      const senza = L.turni.filter((t, i) => !orari[i].inizio || !orari[i].fine).map(t => t.nome);
+      f.querySelector('#x-avvisi').innerHTML = (senza.length ? `<div class="avviso rosso">Manca l'orario di: ${senza.map(esc).join(', ')}. Scrivilo sopra.</div>` : '')
+        + (avvisi.length ? `<details class="avvisi-sett"><summary><b>${avvisi.length} ${avvisi.length === 1 ? 'cosa da guardare' : 'cose da guardare'}</b> in questa settimana</summary>
+          <ul>${avvisi.map(a => `<li>${esc(a.testo)}</li>`).join('')}</ul></details>` : '');
+    };
+    f.querySelectorAll('#x-passo input, #x-passo select').forEach(el => el.addEventListener('change', controlla));
+    controlla();
+    f.querySelector('#x-salva').addEventListener('click', async ev => {
+      const b = ev.currentTarget;
+      const { orari, chi } = leggiScelte();
+      if (L.turni.some((t, i) => !orari[i].inizio || !orari[i].fine)) { controlla(); f.querySelector('#x-err').textContent = 'Prima scrivi gli orari che mancano.'; return; }
+      b.disabled = true; b.textContent = 'Salvo…';
+      try {
+        // 1. le persone nuove
+        const ids = {};
+        for (const n of L.nomi) {
+          if (chi[n] === 'nuovo') ids[n] = (await rpc('pf_salva_persona', { p: { nome: n, cognome: '', email: '', ore_giorno: 9 } })).id;
+          else if (chi[n]) ids[n] = chi[n];
+        }
+        // 2. i turni-tipo
+        const tipoId = [];
+        for (let i = 0; i < L.turni.length; i++) {
+          const t = L.turni[i], y = esistenti.get(t.chiave);
+          tipoId[i] = (await rpc('pf_salva_tipo', { p: { id: y ? y.id : '', nome: y ? y.nome : t.nome, area: t.area, ...orari[i], posizione: i + 1 } })).id;
+        }
+        // 3. la settimana
+        const coll = { ...c }; Object.entries(ids).forEach(([n, id]) => { coll[Settimana.chiaveNome(n)] = id; });
+        const p = {
+          alias: Object.entries(ids).map(([n, id]) => ({ alias: Settimana.chiaveNome(n), persona: id })),
+          celle: L.turni.flatMap((t, i) => t.celle.map((cc, gi) => ({ giorno: L.giorni[gi], tipo: tipoId[i],
+            persone: cc.filter(x => ids[x.nome]).map(x => ({ id: ids[x.nome], nota: x.nota })) }))),
+          feste: L.feste.map((ff, gi) => ({ giorno: L.giorni[gi], persone: ff.filter(n => ids[n]).map(n => ({ id: ids[n] })) })),
+          lavori: L.lavori.flatMap((ll, gi) => ll.map(testo => ({ giorno: L.giorni[gi], testo, persone: Settimana.nominate(testo, coll) })))
+        };
+        await rpc('pf_salva_settimana', { p_lunedi: lunedi, p });
+        settimana = lunedi; chiudiFoglio(); location.hash = '#turni';
+        aggiorna('Settimana salvata: controlla e premi «Pubblica e avvisa».');
+      } catch (e) { b.disabled = false; b.textContent = 'Salva la settimana in Easy'; f.querySelector('#x-err').textContent = motivo(e); }
+    });
+  }
+
   function vTurni() {
+    if (titolare() && (A.tipi || []).length) return vSettimana();
     const g7 = Array.from({ length: 7 }, (_, i) => Conti.piuGiorni(settimana, i));
     const oggi = Conti.oggi();
     const persone = (titolare() ? A.persone.filter(p => p.attivo !== false) : [A.io]);
     const pubblicata = A.settimane.includes(settimana);
     return `<div class="navsett"><button data-az="sett" data-n="-7" aria-label="Settimana prima">‹</button>
         <b>${dataIt(g7[0])} – ${dataIt(g7[6])}</b><button data-az="sett" data-n="7" aria-label="Settimana dopo">›</button></div>
-      ${titolare() ? `<div class="riga-bottoni"><button class="btn" data-az="turno-nuovo">+ Turno</button>
+      ${titolare() ? `<div class="riga-bottoni"><button class="btn" data-az="importa">Importa dal foglio Excel</button><button class="btn sec" data-az="turno-nuovo">+ Turno</button>
         <button class="btn ${pubblicata ? 'chiaro' : 'sec'}" data-az="pubblica">${pubblicata ? 'Pubblicata · avvisa di nuovo' : 'Pubblica e avvisa'}</button></div>
         <p class="sotto">I turni «ogni settimana» si ripetono da soli. Cambia solo le eccezioni, poi premi «Pubblica»: ognuno riceve i suoi.</p>` : ''}
       <div class="scheda">${g7.map(g => {
@@ -704,9 +950,11 @@ const PF = (() => {
         return `<div class="giorno-turni"><h3 class="${g === oggi ? 'oggi' : ''}"><span>${GIORNI[Conti.giornoSettimana(g)]} ${dataIt(g)}</span>
           ${titolare() ? `<button class="link" data-az="turno-nuovo" data-giorno="${g}">+ aggiungi</button>` : ''}</h3>
           ${righe.map(({ p, u }) => `<button class="turno" ${titolare() ? `data-az="turno" data-id="${u.id}" data-giorno="${g}"` : (u.compito ? `data-az="compito" data-id="${u.compito}"` : 'disabled')}>
-            <span>${titolare() ? `<b>${esc(p.nome)}</b> · ` : ''}${esc(u.mansione)}${u.giorno ? '' : ''}</span><span>${u.inizio}–${u.fine}</span></button>`).join('')}
+            <span>${titolare() ? `<b>${esc(p.nome)}</b> · ` : ''}${esc(u.mansione)}${u.nota ? ` <small>${esc(u.nota)}</small>` : ''}</span><span>${u.inizio}–${u.fine}</span></button>`).join('')}
+
           ${ass.map(({ p, a }) => `<div class="turno" style="background:transparent;box-shadow:inset 0 0 0 1px var(--bordo)"><span>${titolare() ? `<b>${esc(p.nome)}</b> · ` : ''}${TIPI[a.tipo]}</span><span></span></div>`).join('')}
-          ${!righe.length && !ass.length ? '<p class="lista-vuota">Nessun turno.</p>' : ''}</div>`;
+          ${!righe.length && !ass.length ? '<p class="lista-vuota">Nessun turno.</p>' : ''}
+          ${!titolare() ? (A.lavori || []).filter(l => l.giorno === g).map(l => `<p class="lavoro">${esc(l.testo)}</p>`).join('') : ''}</div>`;
       }).join('')}</div>`;
   }
   function foglioTurno(u, giorno) {
@@ -1410,6 +1658,11 @@ const PF = (() => {
     'timbra-per-ora': () => foglioTimbraPerOra(),
     correggi: b => foglioCorreggi(A.timbrature.find(t => t.id === b.dataset.id)),
     sett: b => { settimana = Conti.piuGiorni(settimana, Number(b.dataset.n)); disegna(); },
+    importa: () => apriImporta(),
+    tipi: () => foglioTipi(),
+    cella: b => foglioCella(b.dataset.tipo, b.dataset.giorno),
+    lavori: b => foglioLavori(b.dataset.giorno),
+    'copia-sett': () => { if (confirm('Copio turni, feste e lavori della settimana prima in questa?')) rpc('pf_copia_settimana', { p_lunedi: settimana }).then(() => aggiorna('Copiata: cambia quello che serve e pubblica.')).catch(e => toast(motivo(e))); },
     paga: b => foglioPaga(b.dataset.id),
     mese: b => {
       const [a, m] = mese.split('-').map(Number); const d = new Date(Date.UTC(a, m - 1 + Number(b.dataset.n), 1));

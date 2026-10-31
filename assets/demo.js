@@ -119,6 +119,27 @@ const PFDemo = (() => {
   let d;
   try { d = JSON.parse(localStorage.getItem(CHIAVE) || 'null'); } catch (e) { d = null; }
   if (!d) d = nuovi();
+  // dal 31/10/2026: la settimana a griglia (turni-tipo, lavori, nomi del foglio)
+  if (!d.tipi) {
+    d.tipi = [
+      { id: 'y-mm', nome: 'Mungitura mattina', area: 'Stalla', inizio: '05:00', fine: '09:00', inizio2: null, fine2: null, posizione: 1 },
+      { id: 'y-ali', nome: 'Alimentazione', area: 'Stalla', inizio: '06:00', fine: '13:00', inizio2: null, fine2: null, posizione: 2 },
+      { id: 'y-mp', nome: 'Mungitura pomeriggio', area: 'Stalla', inizio: '16:00', fine: '20:00', inizio2: null, fine2: null, posizione: 3 },
+      { id: 'y-vit', nome: 'Vitelli', area: 'Vitellaia', inizio: '07:00', fine: '11:00', inizio2: '15:00', fine2: '18:00', posizione: 4 }];
+    d.lavori = []; d.alias = {};
+    const lun = Conti.lunediDi(Conti.oggi());
+    const giro = { 'y-mm': ['p-ion', 'p-raji'], 'y-ali': ['p-samir'], 'y-mp': ['p-ion', 'p-luca'], 'y-vit': ['p-ahmed'] };
+    for (let i = 0; i < 7; i++) {
+      const g = Conti.piuGiorni(lun, i);
+      for (const y of d.tipi) for (const pid of giro[y.id]) {
+        if ((pid === 'p-luca' && i === 2) || (pid === 'p-raji' && i === 6)) continue;
+        d.turni.push({ id: id(), persona: pid, giorno: g, giorno_settimana: null, inizio: y.inizio, fine: y.fine, mansione: y.nome, tipo: y.id, nota: '' });
+        if (y.inizio2) d.turni.push({ id: id(), persona: pid, giorno: g, giorno_settimana: null, inizio: y.inizio2, fine: y.fine2, mansione: y.nome, tipo: y.id, nota: '' });
+      }
+      d.lavori.push({ id: id(), giorno: g, testo: i % 2 ? 'Samir e Luca: cuccette gruppo 2 con piùLact Pronto' : 'Ion: pulizia sala mungitura e abbeveratoi', persone: i % 2 ? ['p-samir', 'p-luca'] : ['p-ion'], posizione: 1 });
+    }
+    d.assenze.push({ id: id(), persona: 'p-luca', tipo: 'riposo', dal: Conti.piuGiorni(lun, 2), al: Conti.piuGiorni(lun, 2), stato: 'approvata', da_settimana: true });
+  }
   const salva = () => { try { localStorage.setItem(CHIAVE, JSON.stringify(d)); } catch (e) {} };
   let io = 'p-marco';     // chi «è entrato» nella demo
 
@@ -160,6 +181,8 @@ const PFDemo = (() => {
           .map(a => tit || a.persona === io ? a : { id: a.id, persona: a.persona, tipo: 'assente', dal: a.dal, al: a.al, stato: a.stato }),
         turni: tit ? d.turni : d.turni.filter(u => u.persona === io),
         settimane: d.settimane,
+        tipi: d.tipi, alias: tit ? d.alias : {},
+        lavori: d.lavori.filter(l => tit || !l.persone.length || l.persone.includes(io)),
         mansioni: d.mansioni.filter(m => tit || !m.persone.length || m.persone.includes(io))
       };
     },
@@ -250,6 +273,63 @@ const PFDemo = (() => {
       d.turni.push(u); salva(); return { ok: true, id: u.id };
     },
     pf_togli_turno({ p_id }) { titolare(); d.turni = d.turni.filter(u => u.id !== p_id); salva(); return { ok: true }; },
+    pf_salva_tipo({ p }) {
+      titolare();
+      if (!(p.nome || '').trim()) err('Manca il nome del turno.');
+      if (!p.inizio || !p.fine) err(`Il turno «${p.nome}» non ha l'orario completo.`);
+      const v = { nome: p.nome.trim(), area: (p.area || '').trim() || null, inizio: p.inizio, fine: p.fine, inizio2: p.inizio2 || null, fine2: p.fine2 || null };
+      if (p.id) {
+        const y = d.tipi.find(t => t.id === p.id); if (!y) err('Turno non trovato.');
+        Object.assign(y, v); if (p.attivo === false) d.tipi = d.tipi.filter(t => t.id !== p.id);
+        salva(); return { ok: true, id: p.id };
+      }
+      const y = { id: id(), ...v, posizione: Number(p.posizione || 0) }; d.tipi.push(y); salva(); return { ok: true, id: y.id };
+    },
+    _metti(tipo, pid, g, nota) {
+      const y = d.tipi.find(t => t.id === tipo); if (!y) err('Turno non trovato.');
+      d.turni.push({ id: id(), persona: pid, giorno: g, giorno_settimana: null, inizio: y.inizio, fine: y.fine, mansione: y.nome, tipo, nota: nota || '' });
+      if (y.inizio2) d.turni.push({ id: id(), persona: pid, giorno: g, giorno_settimana: null, inizio: y.inizio2, fine: y.fine2, mansione: y.nome, tipo, nota: nota || '' });
+    },
+    pf_salva_cella({ p }) {
+      titolare();
+      if (!p.tipo) {
+        d.assenze = d.assenze.filter(a => !(a.da_settimana && a.dal === p.giorno && a.al === p.giorno && a.tipo === 'riposo'));
+        for (const x of p.persone) d.assenze.push({ id: id(), persona: x.id, tipo: 'riposo', dal: p.giorno, al: p.giorno, stato: 'approvata', da_settimana: true });
+      } else {
+        d.turni = d.turni.filter(u => !(u.tipo === p.tipo && u.giorno === p.giorno));
+        for (const x of p.persone) F._metti(p.tipo, x.id, p.giorno, x.nota);
+      }
+      salva(); return { ok: true };
+    },
+    pf_salva_settimana({ p_lunedi, p }) {
+      titolare();
+      const dentro = g => g >= p_lunedi && g <= Conti.piuGiorni(p_lunedi, 6);
+      for (const a of p.alias || []) d.alias[a.alias] = a.persona;
+      d.turni = d.turni.filter(u => !(u.tipo && dentro(u.giorno)));
+      d.assenze = d.assenze.filter(a => !(a.da_settimana && dentro(a.dal)));
+      d.lavori = d.lavori.filter(l => !dentro(l.giorno));
+      for (const c of p.celle || []) if (dentro(c.giorno)) for (const x of c.persone) F._metti(c.tipo, x.id, c.giorno, x.nota);
+      for (const c of p.feste || []) if (dentro(c.giorno)) for (const x of c.persone) d.assenze.push({ id: id(), persona: x.id, tipo: 'riposo', dal: c.giorno, al: c.giorno, stato: 'approvata', da_settimana: true });
+      (p.lavori || []).forEach((l, i) => { if (dentro(l.giorno) && l.testo.trim()) d.lavori.push({ id: id(), giorno: l.giorno, testo: l.testo.trim(), persone: l.persone || [], posizione: i + 1 }); });
+      salva(); return { ok: true };
+    },
+    pf_copia_settimana({ p_lunedi }) {
+      titolare();
+      const prima = g => g >= Conti.piuGiorni(p_lunedi, -7) && g < p_lunedi, dentro = g => g >= p_lunedi && g <= Conti.piuGiorni(p_lunedi, 6);
+      if (d.turni.some(u => u.tipo && dentro(u.giorno))) err('Questa settimana ha già dei turni: svuotala prima di copiare.');
+      d.turni.filter(u => u.tipo && prima(u.giorno)).forEach(u => d.turni.push({ ...u, id: id(), giorno: Conti.piuGiorni(u.giorno, 7) }));
+      d.assenze.filter(a => a.da_settimana && prima(a.dal)).forEach(a => d.assenze.push({ ...a, id: id(), dal: Conti.piuGiorni(a.dal, 7), al: Conti.piuGiorni(a.al, 7) }));
+      d.lavori.filter(l => prima(l.giorno)).forEach(l => d.lavori.push({ ...l, id: id(), giorno: Conti.piuGiorni(l.giorno, 7) }));
+      salva(); return { ok: true };
+    },
+    pf_salva_lavoro({ p }) {
+      titolare();
+      if (p.id) {
+        if (!p.testo.trim()) d.lavori = d.lavori.filter(l => l.id !== p.id);
+        else Object.assign(d.lavori.find(l => l.id === p.id), { testo: p.testo.trim(), persone: p.persone || [] });
+      } else if (p.testo.trim()) d.lavori.push({ id: id(), giorno: p.giorno, testo: p.testo.trim(), persone: p.persone || [], posizione: 99 });
+      salva(); return { ok: true };
+    },
     pf_pubblica_settimana({ p_lunedi }) {
       titolare();
       if (!d.settimane.includes(p_lunedi)) d.settimane.push(p_lunedi);
