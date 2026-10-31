@@ -7,8 +7,8 @@
    Ruoli (li decide il database, 36-app-pro-farmer.sql):
      - titolare: home, poi Presenze con Oggi, Turni, Ferie, Mese, Altro;
      - dipendente: va dritto a Presenze con Timbra, Turni, Ferie, Compiti;
-     - tablet di stalla (#chiosco): nessun accesso, una chiave sul tablet e il
-       PIN di ognuno; può solo timbrare.
+     - il tablet di stalla col PIN (#chiosco) è stato tolto il 31/10/2026
+       (decisione di Giulio): ognuno timbra dal suo telefono.
    ?demo: tutto con il finto database di demo.js, niente parte verso Supabase.
 
    Senza rete: le timbrature restano in una coda sul telefono (con l'ora del
@@ -117,7 +117,7 @@ const PF = (() => {
         <p class="sotto" style="margin:4px 0 10px">Easy è gratuita per i clienti piùLact: crei l'account, chiedi l'attivazione e Pro Farmer ti abilita.
           Se sei un dipendente, l'accesso te lo manda il tuo titolare.</p>
         <button class="btn sec pieno" id="crea">Crea l'account</button></div>
-      <p class="sotto"><a href="?demo">Guarda la demo</a> · <a href="#chiosco">Questo è il tablet di stalla</a></p>
+      <p class="sotto"><a href="?demo">Guarda la demo</a></p>
     </div>`;
     occhio();
     const leggiEmail = () => {
@@ -409,8 +409,7 @@ const PF = (() => {
     const io = PFDemo.chi();
     return `<div class="barra-demo">DEMO · Sei
       <select id="demo-chi" aria-label="Chi sei nella demo">${PFDemo.persone().map(p =>
-        `<option value="${p.id}"${p.id === io && location.hash !== '#chiosco' ? ' selected' : ''}>${esc(p.nome)}${p.ruolo === 'titolare' ? ' (titolare)' : ''}</option>`).join('')}
-        <option value="tablet"${location.hash === '#chiosco' ? ' selected' : ''}>il tablet di stalla</option></select>
+        `<option value="${p.id}"${p.id === io ? ' selected' : ''}>${esc(p.nome)}${p.ruolo === 'titolare' ? ' (titolare)' : ''}</option>`).join('')}</select>
       <button id="demo-ricomincia">Ricomincia</button></div>`;
   }
 
@@ -1084,19 +1083,13 @@ const PF = (() => {
     return `<h2 class="sezione">Persone</h2>
       <div class="scheda">${persone.map(p => `<button class="persona" style="width:100%;text-align:left" data-az="persona" data-id="${p.id}">
         <span class="avatar">${iniziale(p)}</span><span class="chi"><b>${esc(nome(p))}${p.attivo === false ? ' · non più attivo' : ''}</b>
-        <span>${p.ruolo === 'titolare' ? 'Titolare' : 'Dipendente'} · ${p.ore_giorno} ore al giorno${p.pin ? ' · PIN' : ''}${p.email ? (p.invitato ? ' · accesso mandato' : ' · accesso da mandare') : ' · senza e-mail'}</span></span></button>`).join('')}
+        <span>${p.ruolo === 'titolare' ? 'Titolare' : 'Dipendente'} · ${p.ore_giorno} ore al giorno${p.email ? (p.invitato ? ' · accesso mandato' : ' · accesso da mandare') : ' · senza e-mail'}</span></span></button>`).join('')}
         <button class="btn sec pieno" style="margin-top:10px" data-az="persona">+ Aggiungi una persona</button></div>
       <h2 class="sezione">I QR in stalla</h2>
       <div class="scheda">${A.punti.map(q => `<div class="riga"><span><b>${esc(q.nome)}</b>${q.attivo ? '' : ' · spento'}${q.lat ? '<br><span class="sotto">con l’area intorno</span>' : ''}</span>
         <span class="dx"><button class="btn piccolo" data-az="stampa-qr" data-id="${q.id}">Stampa</button>
         <button class="btn piccolo sec" data-az="punto" data-id="${q.id}">Cambia</button></span></div>`).join('') || '<p class="lista-vuota">Nessun QR: aggiungine uno, per esempio «Sala mungitura».</p>'}
         <button class="btn sec pieno" style="margin-top:10px" data-az="punto">+ Aggiungi un QR</button></div>
-      <h2 class="sezione">Tablet di stalla</h2>
-      <div class="scheda"><p class="sotto">Un tablet o un vecchio telefono fisso in sala mungitura: ognuno tocca il suo nome e scrive il suo PIN di 4 cifre.
-        Serve a chi non ha il telefono, e nessuno può timbrare per un collega.</p>
-        ${A.dispositivi.filter(d => d.attivo).map(d => `<div class="riga"><span>${esc(d.nome)}${d.ultimo_uso ? `<br><span class="sotto">usato ${dataIt(Conti.roma(d.ultimo_uso).giorno)}</span>` : ''}</span>
-          <span class="dx"><button class="btn piccolo sec" data-az="togli-tablet" data-id="${d.id}">Scollega</button></span></div>`).join('')}
-        <button class="btn sec pieno" style="margin-top:10px" data-az="collega-tablet">Usa questo dispositivo come tablet di stalla</button></div>
       <h2 class="sezione">Mansionario</h2>
       <div class="scheda">${A.mansioni.map(m => `<button class="riga" style="width:100%;text-align:left" data-az="mansione" data-id="${m.id}">
         <span><b>${esc(m.titolo)}</b><br><span class="sotto">${m.persone.length ? m.persone.map(id => esc((persona(id) || {}).nome || '')).join(', ') : 'Tutti'}</span></span><span class="dx">›</span></button>`).join('')
@@ -1124,7 +1117,7 @@ const PF = (() => {
     foglio(p ? nome(p) : 'Nuova persona', `
       <div class="due"><div class="campo"><label for="p-nome">Nome</label><input id="p-nome" value="${esc(p ? p.nome : '')}" autocomplete="off"></div>
         <div class="campo"><label for="p-cognome">Cognome</label><input id="p-cognome" value="${esc(p ? p.cognome : '')}" autocomplete="off"></div></div>
-      <div class="campo"><label for="p-email">E-mail (per timbrare dal suo telefono; senza, timbra dal tablet con il PIN)</label>
+      <div class="campo"><label for="p-email">E-mail (per timbrare dal suo telefono)</label>
         <input id="p-email" type="email" inputmode="email" autocapitalize="off" value="${esc(p ? p.email || '' : '')}"></div>
       <div class="campo"><label for="p-ore">Orario di contratto, ore al giorno</label><input id="p-ore" type="number" inputmode="decimal" min="0" max="16" step="0.5" value="${p ? p.ore_giorno : 9}"></div>
       ${p ? `<div class="campo"><label for="p-paga">Paga oraria netta, € all’ora (la vedi solo tu, nel cruscotto)</label>
@@ -1132,8 +1125,7 @@ const PF = (() => {
       ${p && !tit && p.id !== A.io.id ? `<label class="spunta"><input type="checkbox" id="p-attivo"${p.attivo !== false ? ' checked' : ''}> <span>Lavora ancora qui (togli la spunta quando smette: le sue ore restano)</span></label>` : ''}
       <p class="errore" id="p-err"></p>
       <button class="btn pieno" id="p-salva">Salva</button>
-      ${p ? `<div class="riga-bottoni"><button class="btn sec" id="p-pin">${p.pin ? 'Cambia il PIN' : 'Dai un PIN'}</button>
-        ${p.email && p.id !== A.io.id ? `<button class="btn sec" id="p-invita">${p.invitato ? 'Rimanda l’accesso' : 'Manda l’accesso'}</button>` : ''}</div>
+      ${p ? `${p.email && p.id !== A.io.id ? `<div class="riga-bottoni"><button class="btn sec" id="p-invita">${p.invitato ? 'Rimanda l’accesso' : 'Manda l’accesso'}</button></div>` : ''}
         ${p.email && p.id !== A.io.id ? `<p class="sotto">${p.invitato ? 'Accesso mandato: entra con la sua e-mail e sceglie la sua password, poi timbra dal suo telefono.'
           : 'Manda l’accesso: gli arriva un’e-mail, entra con la sua e-mail, sceglie la password e timbra dal suo telefono.'}</p>` : ''}` : ''}`, f => {
       const campoPaga = f.querySelector('#p-paga');
@@ -1145,19 +1137,9 @@ const PF = (() => {
         }
         salvaE('pf_salva_persona', { p: { id: p ? p.id : '', nome: f.querySelector('#p-nome').value, cognome: f.querySelector('#p-cognome').value,
           email: f.querySelector('#p-email').value, ore_giorno: f.querySelector('#p-ore').value, attivo: att ? att.checked : undefined } },
-          p ? 'Salvato.' : 'Aggiunto. Ora dagli il PIN o mandagli l’accesso.', f);
+          p ? 'Salvato.' : 'Aggiunto. Ora mettigli l’e-mail e mandagli l’accesso.', f);
       });
-      const pin = f.querySelector('#p-pin'); if (pin) pin.addEventListener('click', () => foglioPin(p));
       const inv = f.querySelector('#p-invita'); if (inv) inv.addEventListener('click', () => invita(p, inv));
-    });
-  }
-  function foglioPin(p) {
-    foglio(`Il PIN di ${p.nome}`, `<p class="sotto">4 cifre, da tenere per sé. Serve sul tablet di stalla.</p>
-      <div class="campo"><label for="pin">PIN</label><input id="pin" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"></div>
-      <p class="errore" id="pin-err"></p><button class="btn pieno" id="pin-salva">Salva il PIN</button>`, f => {
-      f.querySelector('#pin').focus();
-      f.querySelector('#pin-salva').addEventListener('click', () =>
-        salvaE('pf_imposta_pin', { p_persona: p.id, p_pin: f.querySelector('#pin').value.replace(/\D/g, '') }, 'PIN salvato.', f));
     });
   }
   function invita(p, b) {
@@ -1454,76 +1436,6 @@ const PF = (() => {
     });
   }
 
-  /* --------------------------------------------------- il tablet di stalla */
-  let chiosco = { persone: [], azienda: '', timer: null };
-  function chiaveChiosco() { return DEMO ? 'demo.tablet' : leggi(K_CHIOSCO, null); }
-  function mostraChiosco(msg) {
-    fermaOrologio();
-    const k = chiaveChiosco();
-    if (!k) {
-      app().innerHTML = `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer"><h1>Tablet di stalla</h1>
-        <p class="sotto">Questo dispositivo non è ancora collegato. Il titolare entra con la sua e-mail e, in Altro → Tablet di stalla,
-        preme «Usa questo dispositivo come tablet di stalla».</p><a class="btn pieno" href="#">Entra come titolare</a></div>`;
-      return;
-    }
-    rpc('pf_chiosco_persone', { p_chiave: k }).then(r => {
-      chiosco.persone = r.persone; chiosco.azienda = r.azienda;
-      disegnaChiosco(msg);
-    }).catch(e => {
-      if (e.delDatabase) { if (!DEMO) scrivi(K_CHIOSCO, null); return mostraChiosco(); }
-      disegnaChiosco('Senza rete: le timbrature restano qui e partono quando torna il segnale.');
-    });
-  }
-  function disegnaChiosco(msg) {
-    const coda = leggi(K_CODA, []).filter(c => c.tipo === 'chiosco').length;
-    app().className = 'largo';
-    app().innerHTML = barraDemo() + `<div class="chiosco">
-      <div class="alto"><div><p class="sotto">${esc(chiosco.azienda)} · ${dataLunga(Conti.oggi())}</p>
-        <p class="orologio" id="orologio">${Conti.roma(new Date().toISOString()).ora}</p></div>
-        <img src="assets/logo-bianco.png" alt="Pro Farmer" style="height:34px"></div>
-      <p class="saluto" style="font-size:22px">Tocca il tuo nome</p>
-      ${msg ? `<div class="avviso">${esc(msg)}</div>` : ''}${coda ? `<div class="avviso">${coda} timbrature aspettano la rete.</div>` : ''}
-      <div class="griglia-persone">${chiosco.persone.map(p => `<button data-az="chiosco-persona" data-id="${p.id}">
-        <span class="avatar${p.dentro ? ' dentro' : ''}">${esc(p.nome[0] || '?')}</span>${esc(p.nome)} ${esc(p.cognome || '')}.
-        <small>${p.dentro ? 'dentro · tocca per l’uscita' : 'fuori · tocca per l’entrata'}</small></button>`).join('')}</div>
-      <p class="sotto" style="margin-top:auto">Solo l’ora di entrata e di uscita. <button class="link" data-az="chiosco-esci">Scollega questo tablet</button></p></div>`;
-    avviaOrologio();
-  }
-  function pinChiosco(pid) {
-    const p = chiosco.persone.find(x => x.id === pid);
-    if (!p.pin) return esito(false, 'Manca il PIN', `${p.nome}, chiedi al titolare di darti il PIN di 4 cifre.`);
-    let pin = '';
-    const f = foglio(`${p.nome}: ${p.dentro ? 'uscita' : 'entrata'}`, `<p class="sotto" style="text-align:center">Scrivi il tuo PIN</p>
-      <div class="puntini" aria-live="polite">${'<i></i>'.repeat(4)}</div>
-      <div class="tastierino">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-n="${n}">${n}</button>`).join('')}
-        <button data-n="c" aria-label="Cancella">⌫</button><button data-n="0">0</button><button data-n="x" aria-label="Annulla">✕</button></div>
-      <p class="errore" id="pin-err" style="text-align:center"></p>`);
-    const punti = () => f.querySelectorAll('.puntini i').forEach((x, i) => x.classList.toggle('pieno', i < pin.length));
-    f.querySelector('.tastierino').addEventListener('click', ev => {
-      const b = ev.target.closest('button'); if (!b) return;
-      const n = b.dataset.n;
-      if (n === 'x') return chiudiFoglio();
-      if (n === 'c') { pin = pin.slice(0, -1); return punti(); }
-      if (pin.length >= 4) return;
-      pin += n; punti();
-      if (pin.length === 4) {
-        const args = { p_chiave: chiaveChiosco(), p_persona: pid, p_pin: pin, p_verso: p.dentro ? 'uscita' : 'entrata',
-          p_ora_telefono: new Date().toISOString(), p_chiave_invio: nuovaChiave() };
-        rpc('pf_chiosco_timbra', args).then(r => {
-          if (!r.ok) { pin = ''; punti(); f.querySelector('#pin-err').textContent = r.motivo; return; }
-          chiudiFoglio();
-          esito(true, `${p.nome}: ${r.verso}`, `${r.gia ? 'Era già segnata alle' : 'Alle'} ${ora(r.quando)}.`, () => mostraChiosco());
-        }).catch(e => {
-          chiudiFoglio();
-          if (e.delDatabase) return esito(false, 'Non timbrata', e.message, () => mostraChiosco());
-          metti({ tipo: 'chiosco', args });
-          p.dentro = !p.dentro;
-          esito(true, `${p.nome}: ${args.p_verso}`, `Senza rete: salvata alle ${ora(args.p_ora_telefono)}, parte appena torna il segnale.`, () => disegnaChiosco());
-        });
-      }
-    });
-  }
-
   /* --------------------------------------------------------- i tocchi */
   const AZ = {
     esci, notifiche: attivaNotifiche, inquadra,
@@ -1579,21 +1491,7 @@ const PF = (() => {
     'stampa-qr': b => stampaQR(A.punti.find(q => q.id === b.dataset.id)),
     regole: () => foglioRegole(),
     mansione: b => foglioMansione(b.dataset.id ? A.mansioni.find(m => m.id === b.dataset.id) : null),
-    'collega-tablet': () => {
-      if (!confirm('Questo dispositivo diventa il tablet di stalla: si esce dal tuo accesso e resta solo la schermata per timbrare con il PIN. Continuo?')) return;
-      rpc('pf_nuovo_dispositivo', { p_nome: 'Tablet di stalla' }).then(r => {
-        if (!DEMO) { scrivi(K_CHIOSCO, r.chiave); collegamento().auth.signOut(); }
-        location.hash = '#chiosco'; mostraChiosco();
-      }).catch(e => toast(motivo(e)));
-    },
-    'timbra-io': b => timbraIo(b.dataset.verso),
-    'togli-tablet': b => rpc('pf_togli_dispositivo', { p_id: b.dataset.id }).then(() => aggiorna('Tablet scollegato.')).catch(e => toast(motivo(e))),
-    'chiosco-persona': b => pinChiosco(b.dataset.id),
-    'chiosco-esci': () => {
-      if (!confirm('Scollego il tablet? Per ricollegarlo serve il titolare.')) return;
-      if (!DEMO) scrivi(K_CHIOSCO, null);
-      location.hash = ''; DEMO ? (PFDemo.diventa('p-marco'), carica()) : mostraAccesso();
-    }
+    'timbra-io': b => timbraIo(b.dataset.verso)
   };
   document.addEventListener('click', ev => {
     const b = ev.target.closest('[data-az]');
@@ -1607,7 +1505,6 @@ const PF = (() => {
   document.addEventListener('change', ev => {
     if (ev.target.id !== 'demo-chi') return;
     const v = ev.target.value;
-    if (v === 'tablet') { location.hash = '#chiosco'; return mostraChiosco(); }
     PFDemo.diventa(v); location.hash = ''; carica();
   });
   document.addEventListener('click', ev => {
@@ -1623,7 +1520,6 @@ const PF = (() => {
   /* ------------------------------------------------------------ partenza */
   window.addEventListener('hashchange', () => {
     const h = location.hash;
-    if (h === '#chiosco') return mostraChiosco();
     if (/#collega=/.test(h)) return collegamentoVecchio();
     if (h === '#primo-accesso' && !A) return mostraPrimo();
     const c = codiceDa(h);
@@ -1634,7 +1530,9 @@ const PF = (() => {
   function parti() {
     if ('serviceWorker' in navigator && !DEMO && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
     if (/#collega=/.test(location.hash)) return collegamentoVecchio();
-    if (location.hash === '#chiosco' || (!DEMO && leggi(K_CHIOSCO, null) && !location.hash)) { location.hash = '#chiosco'; return mostraChiosco(); }
+    // il tablet di stalla non c'è più (31/10/2026): via la sua chiave e l'indirizzo #chiosco
+    if (!DEMO && leggi(K_CHIOSCO, null)) scrivi(K_CHIOSCO, null);
+    if (location.hash === '#chiosco') history.replaceState(null, '', location.pathname + location.search);
     const qr = codiceDa(location.hash);
     if (DEMO) return carica(() => { disegna(); if (qr) timbraQR(qr); });
     collegamento().auth.getSession().then(({ data }) => {
