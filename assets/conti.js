@@ -143,6 +143,30 @@ const Conti = (() => {
     return lista.filter(u => u.mansione !== 'riposo').sort((a, b) => (a.inizio || '').localeCompare(b.inizio || ''));
   }
 
+  /* La durata del turno di un giorno, in minuti (dal 31/10/2026): la somma dei
+     turni segnati quel giorno; senza turni, l'orario della persona (ore_giorno,
+     9 ore per tutti all'inizio). Serve al contatore e all'«oltre l'orario». */
+  const minuti = hm => { const [h, m] = String(hm || '0:0').split(':').map(Number); return h * 60 + (m || 0); };
+  function durataTurno(persona, turni, g) {
+    const lista = turniDelGiorno(turni || [], persona.id, g).filter(u => u.inizio && u.fine);
+    if (lista.length) return lista.reduce((n, u) => n + ((minuti(u.fine) - minuti(u.inizio) + 1440) % 1440 || 1440), 0);
+    return Math.round(Number(persona.ore_giorno || 9) * 60);
+  }
+  // I minuti oltre il turno di un'uscita (o di adesso, se è ancora dentro): null se non c'è l'entrata.
+  const TOLLERANZA = 15;                    // sotto i 15 minuti non si segnala
+  function oltre(timbrature, persona, turni, uscita) {
+    const fine = uscita ? new Date(uscita.quando) : new Date();
+    const entrata = valide(timbrature).filter(x => x.persona === persona.id && x.verso === 'entrata' && new Date(x.quando) < fine
+      && (fine - new Date(x.quando)) <= 20 * 3600e3).sort((a, b) => b.quando.localeCompare(a.quando))[0];
+    if (!entrata) return null;
+    if (uscita && valide(timbrature).some(x => x.persona === persona.id && x.verso === 'uscita' && x.quando > entrata.quando && x.quando < uscita.quando)) return null;
+    const presenza = Math.floor((fine - new Date(entrata.quando)) / 60000);
+    return { entrata, presenza, durata: durataTurno(persona, turni, roma(entrata.quando).giorno),
+      get minuti() { return this.presenza - this.durata; } };
+  }
+  // 155 → '2 h 35 min'
+  const durataTesto = m => { m = Math.max(0, Math.round(m)); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`; };
+
   return { roma, oggi, giorniDelMese, giornoSettimana, piuGiorni, lunediDi, coppie, foglio, dentro,
-    turniDelGiorno, hhmm, ore, valide };
+    turniDelGiorno, hhmm, ore, valide, durataTurno, oltre, durataTesto, TOLLERANZA };
 })();

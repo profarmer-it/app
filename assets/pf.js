@@ -475,12 +475,20 @@ const PF = (() => {
   function statoPersona(p) {
     const oggi = Conti.oggi();
     const d = Conti.dentro(A.timbrature, p.id);
-    if (d) return `<span class="chip verde">Dentro dalle ${ora(d.quando)}</span>`;
+    if (d) {
+      const o = Conti.oltre(A.timbrature, p, A.turni, null);
+      return `<span class="chip verde">Dentro dalle ${ora(d.quando)}</span>${o ? ` <span class="chip">${Conti.durataTesto(o.presenza)}</span>` : ''}`
+        + (o && o.minuti >= Conti.TOLLERANZA ? ` <span class="chip arancio">oltre l’orario di ${Conti.durataTesto(o.minuti)}</span>` : '');
+    }
     const a = assenzaDel(p.id, oggi);
     if (a) return `<span class="chip">${TIPI[a.tipo]}</span>`;
     const ultima = Conti.valide(A.timbrature).filter(t => t.persona === p.id && Conti.roma(t.quando).giorno === oggi)
       .sort((x, y) => y.quando.localeCompare(x.quando))[0];
-    if (ultima) return `<span class="chip">Uscito alle ${ora(ultima.quando)}</span>`;
+    if (ultima) {
+      const o = ultima.verso === 'uscita' ? Conti.oltre(A.timbrature, p, A.turni, ultima) : null;
+      return `<span class="chip">Uscito alle ${ora(ultima.quando)}</span>`
+        + (o && o.minuti >= Conti.TOLLERANZA ? ` <span class="chip arancio">${Conti.durataTesto(o.minuti)} oltre l’orario</span>` : '');
+    }
     const t = Conti.turniDelGiorno(A.turni, p.id, oggi)[0];
     return t ? `<span class="chip">Turno alle ${t.inizio}</span>` : '<span class="chip">Fuori</span>';
   }
@@ -509,12 +517,17 @@ const PF = (() => {
   }
   const MODI = { qr: 'QR', chiosco: 'tablet', titolare: 'dal titolare', correzione: 'corretta', telefono: 'suo telefono' };
   const AREE = { fuori: ' · <b style="color:var(--rosso)">fuori area</b>', nd: ' · posizione non data' };
+  function oltreRiga(t, p) {
+    if (t.verso !== 'uscita' || t.valida === false || !p) return '';
+    const o = Conti.oltre(A.timbrature, p, A.turni, t);
+    return o && o.minuti >= Conti.TOLLERANZA ? ` · <b style="color:var(--arancio)">+${Conti.durataTesto(o.minuti)}</b>` : '';
+  }
   function rigaTimbratura(t) {
     const p = persona(t.persona);
     const vecchia = t.valida === false;
     return `<button class="riga" style="width:100%;text-align:left${vecchia ? ';opacity:.5;text-decoration:line-through' : ''}" ${vecchia ? 'disabled' : `data-az="correggi" data-id="${t.id}"`}>
       <span><b>${ora(t.quando)}</b> ${t.verso} · ${esc(p ? p.nome : '')}${t.motivo ? `<br><span class="sotto">${esc(t.motivo)}</span>` : ''}</span>
-      <span class="dx">${MODI[t.modo] || ''}${AREE[t.area] || ''}</span></button>`;
+      <span class="dx">${MODI[t.modo] || ''}${AREE[t.area] || ''}${oltreRiga(t, p)}</span></button>`;
   }
 
   /* --------------------------------------------------------------- timbra */
@@ -533,6 +546,7 @@ const PF = (() => {
     return `<p class="saluto">Ciao ${esc(A.io.nome)}</p>
       <p class="orologio" id="orologio">${Conti.roma(new Date().toISOString()).ora}</p>
       <p class="data">${dataLunga(oggi)}</p>
+      ${dentro ? contatore(dentro.quando) : ''}
       ${a ? `<div class="avviso">Oggi sei in ${TIPI[a.tipo].toLowerCase()}.</div>` : ''}
       <button class="btn enorme" data-az="timbra-io" data-verso="${dentro ? 'uscita' : 'entrata'}">${verifica === 'qr' ? svg('timbra') + ' ' : ''}${dentro ? 'Uscita · fine lavoro' : 'Entrata · inizio lavoro'}</button>
       <p class="sotto" style="text-align:center">${verifica === 'posizione' ? 'Quando premi, il telefono dice solo se sei in azienda. Nessun tracciamento.'
@@ -547,11 +561,27 @@ const PF = (() => {
         <div class="riga"><span>Le tue ore di ${MESI[Number(oggi.slice(5, 7)) - 1]}</span><span class="dx">${Conti.hhmm(f.totale.lavoro)}</span></div></div>
       <p class="sotto">Se hai sbagliato una timbratura, dillo al titolare: la corregge lui.</p>`;
   }
+  /* Il contatore dopo l'entrata (dal 31/10/2026): da quanto si lavora, quando
+     finisce il turno e, dopo, di quanto lo si è passato. */
+  function contatore(dal) {
+    const o = Conti.oltre(A.timbrature, A.io, A.turni, null) || { presenza: Math.floor((Date.now() - new Date(dal)) / 60000), durata: Conti.durataTurno(A.io, A.turni, Conti.oggi()), get minuti() { return this.presenza - this.durata; } };
+    const fine = new Date(new Date(dal).getTime() + o.durata * 60000).toISOString();
+    const oltre = o.minuti > 0;
+    return `<div class="contatore${oltre ? ' oltre' : ''}" id="contatore" data-dal="${dal}" role="timer" aria-live="off">
+      <span class="etichetta">Al lavoro da</span>
+      <b class="tempo">${Conti.durataTesto(o.presenza)}</b>
+      <span class="fine${oltre ? ' oltre' : ''}">${oltre ? `Oltre l’orario di ${Conti.durataTesto(o.minuti)}<br><span style="font-weight:500;color:var(--testo-2)">Turno finito alle ${ora(fine)}</span>`
+        : `Fine turno alle ${ora(fine)} · turno di ${Conti.durataTesto(o.durata).replace(' 00 min', '')}`}</span></div>`;
+  }
   function avviaOrologio() {
-    orologio = setInterval(() => {
+    const passo = () => {
       const el = document.getElementById('orologio');
-      if (el) el.textContent = Conti.roma(new Date().toISOString()).ora; else fermaOrologio();
-    }, 10000);
+      if (!el) return fermaOrologio();
+      el.textContent = Conti.roma(new Date().toISOString()).ora;
+      const c = document.getElementById('contatore');
+      if (c) c.outerHTML = contatore(c.dataset.dal);
+    };
+    orologio = setInterval(passo, 10000);
   }
   function fermaOrologio() { if (orologio) clearInterval(orologio); orologio = null; }
 
@@ -905,7 +935,7 @@ const PF = (() => {
         <div class="campo"><label for="p-cognome">Cognome</label><input id="p-cognome" value="${esc(p ? p.cognome : '')}" autocomplete="off"></div></div>
       <div class="campo"><label for="p-email">E-mail (per timbrare dal suo telefono; senza, timbra dal tablet con il PIN)</label>
         <input id="p-email" type="email" inputmode="email" autocapitalize="off" value="${esc(p ? p.email || '' : '')}"></div>
-      <div class="campo"><label for="p-ore">Orario di contratto, ore al giorno</label><input id="p-ore" type="number" inputmode="decimal" min="0" max="16" step="0.5" value="${p ? p.ore_giorno : 8}"></div>
+      <div class="campo"><label for="p-ore">Orario di contratto, ore al giorno</label><input id="p-ore" type="number" inputmode="decimal" min="0" max="16" step="0.5" value="${p ? p.ore_giorno : 9}"></div>
       ${p && !tit && p.id !== A.io.id ? `<label class="spunta"><input type="checkbox" id="p-attivo"${p.attivo !== false ? ' checked' : ''}> <span>Lavora ancora qui (togli la spunta quando smette: le sue ore restano)</span></label>` : ''}
       <p class="errore" id="p-err"></p>
       <button class="btn pieno" id="p-salva">Salva</button>

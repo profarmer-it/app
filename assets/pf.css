@@ -68,6 +68,12 @@ h2.sezione{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacin
 
 .orologio{font-size:64px;font-weight:800;letter-spacing:-.03em;line-height:1;text-align:center;font-variant-numeric:tabular-nums;margin-top:6px}
 .data{text-align:center;color:var(--testo-2);font-size:15px}
+.contatore{display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;background:var(--fondo-2);border:1px solid var(--bordo);border-radius:var(--raggio);padding:14px 16px}
+.contatore .etichetta{font-size:13px;font-weight:700;color:var(--testo-3);text-transform:none}
+.contatore .tempo{font-size:34px;font-weight:800;letter-spacing:-.02em;line-height:1.1;font-variant-numeric:tabular-nums}
+.contatore .fine{font-size:14px;color:var(--testo-2)}
+.contatore .fine.oltre{color:var(--arancio-2);font-weight:700}
+.contatore.oltre{border-color:var(--arancio)}
 
 .riga{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bordo);font-size:14.5px}
 .riga:last-child{border-bottom:0}

@@ -18,12 +18,12 @@ const PFDemo = (() => {
   // ------------------------------------------------------------ i dati finti
   function nuovi() {
     const persone = [
-      { id: 'p-marco', nome: 'Marco', cognome: 'Rossi', ruolo: 'titolare', email: 'marco@cascinademo.it', ore_giorno: 8, pin: '2580' },
-      { id: 'p-ion', nome: 'Ion', cognome: 'Popescu', ruolo: 'dipendente', email: 'ion@cascinademo.it', ore_giorno: 7, pin: '1470' },
-      { id: 'p-raji', nome: 'Rajinder', cognome: 'Singh', ruolo: 'dipendente', email: '', ore_giorno: 7, pin: '3690' },
-      { id: 'p-samir', nome: 'Samir', cognome: 'Benali', ruolo: 'dipendente', email: 'samir@cascinademo.it', ore_giorno: 7, pin: '1593' },
-      { id: 'p-luca', nome: 'Luca', cognome: 'Ferrari', ruolo: 'dipendente', email: 'luca@cascinademo.it', ore_giorno: 6, pin: '7531' },
-      { id: 'p-ahmed', nome: 'Ahmed', cognome: 'Khan', ruolo: 'dipendente', email: '', ore_giorno: 7, pin: '8462' }
+      { id: 'p-marco', nome: 'Marco', cognome: 'Rossi', ruolo: 'titolare', email: 'marco@cascinademo.it', ore_giorno: 9, pin: '2580' },
+      { id: 'p-ion', nome: 'Ion', cognome: 'Popescu', ruolo: 'dipendente', email: 'ion@cascinademo.it', ore_giorno: 9, pin: '1470' },
+      { id: 'p-raji', nome: 'Rajinder', cognome: 'Singh', ruolo: 'dipendente', email: '', ore_giorno: 9, pin: '3690' },
+      { id: 'p-samir', nome: 'Samir', cognome: 'Benali', ruolo: 'dipendente', email: 'samir@cascinademo.it', ore_giorno: 9, pin: '1593' },
+      { id: 'p-luca', nome: 'Luca', cognome: 'Ferrari', ruolo: 'dipendente', email: 'luca@cascinademo.it', ore_giorno: 9, pin: '7531' },
+      { id: 'p-ahmed', nome: 'Ahmed', cognome: 'Khan', ruolo: 'dipendente', email: '', ore_giorno: 9, pin: '8462' }
     ].map(p => ({ ...p, attivo: true, invitato: !!p.email, dal: '2025-01-01', al: null }));
 
     // i turni ricorrenti di una stalla da 300 vacche
@@ -208,7 +208,7 @@ const PFDemo = (() => {
         salva(); return { ok: true, id: x.id };
       }
       const x = { id: id(), nome: p.nome.trim(), cognome: (p.cognome || '').trim(), ruolo: 'dipendente', email: (p.email || '').trim().toLowerCase(),
-        ore_giorno: Number(p.ore_giorno || 8), attivo: true, invitato: false, dal: Conti.oggi(), al: null, pin: null };
+        ore_giorno: Number(p.ore_giorno || 9), attivo: true, invitato: false, dal: Conti.oggi(), al: null, pin: null };
       d.persone.push(x); salva(); return { ok: true, id: x.id };
     },
     pf_salva_punto({ p }) {
