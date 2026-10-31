@@ -37,6 +37,7 @@ const PF = (() => {
 
   let sb = null, A = null, emailAccesso = '', orologio = null;
   let settimana = Conti.lunediDi(Conti.oggi()), mese = Conti.oggi().slice(0, 7), datiMese = null;
+  let paghe = null;                         // { persona: paga oraria netta }, solo per il titolare (dal 31/10/2026)
   const app = () => document.getElementById('app');
 
   /* ---------------------------------------------------------------- utilità */
@@ -419,7 +420,7 @@ const PF = (() => {
     const v = vistaDaHash();
     const da = { home: vHome, oggi: vOggi, turni: vTurni, ferie: vFerie, mese: vMese, altro: vAltro, timbra: vTimbra, compiti: vCompiti, profilo: vProfilo }[v];
     const daDecidere = titolare() ? A.assenze.filter(a => a.stato === 'chiesta').length : 0;
-    const titolo = { home: '', oggi: 'Oggi', turni: 'Turni', ferie: 'Ferie e riposi', mese: 'Il mese', altro: 'Impostazioni',
+    const titolo = { home: '', oggi: 'Oggi', turni: 'Turni', ferie: 'Ferie e riposi', mese: 'Cruscotto del mese', altro: 'Impostazioni',
       timbra: '', compiti: 'Compiti', profilo: 'Profilo' }[v];
     app().className = v === 'mese' ? 'largo' : '';
     if (!A.attiva) {
@@ -816,12 +817,62 @@ const PF = (() => {
     const persone = A.persone.filter(p => (p.ruolo === 'dipendente' && p.attivo !== false) || timbra(p));
     return persone.map(p => Conti.foglio(p, d.timbrature, d.assenze, A.azienda, mese));
   }
+  const euro = n => n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR', useGrouping: 'always' });
+  const caricaPaghe = () => paghe ? Promise.resolve(paghe) : rpc('pf_paghe').then(r => (paghe = r || {})).catch(() => ({}));
+  /* Il cruscotto del mese (dal 31/10/2026, solo il titolare): per ognuno le ore
+     lavorate, il netto (ore × paga oraria netta, straordinari compresi alla
+     stessa paga) e i riposi, dichiarati o senza timbrature. */
+  function cruscotto(ff, pp) {
+    const oggi = Conti.oggi();
+    const righe = ff.map(f => {
+      const paga = pp[f.persona.id] != null ? Number(pp[f.persona.id]) : null;
+      const dal = f.persona.dal || '';
+      const senza = f.giorni.filter(g => g.giorno < oggi && g.giorno >= dal && !g.coppie.length && !g.causale).length;
+      return { f, paga, netto: paga == null ? null : Math.round(f.totale.lavoro * paga * 100) / 100,
+        dichiarati: f.totale.riposo, senza, ferie: f.totale.ferie, malattia: f.totale.malattia };
+    });
+    const tot = k => righe.reduce((n, r) => n + (r[k] || 0), 0);
+    const ore = ff.reduce((n, f) => n + f.totale.lavoro, 0);
+    const manca = righe.filter(r => r.paga == null);
+    return `<div class="cruscotto">
+        <div class="cifra"><span>Ore lavorate</span><b>${Conti.hhmm(ore)}</b></div>
+        <div class="cifra forte"><span>Netto guadagnato</span><b>${euro(tot('netto'))}</b></div>
+        <div class="cifra"><span>Riposi</span><b>${tot('dichiarati') + tot('senza')}</b><small>${tot('dichiarati')} dichiarat${tot('dichiarati') === 1 ? 'o' : 'i'} · ${tot('senza')} senza timbrature</small></div>
+      </div>
+      <div class="scheda scorre"><table class="tab-tabella">
+        <tr><th>Persona</th><th>Ore</th><th>Paga</th><th>Netto</th><th><abbr title="Riposi: dichiarati + senza timbrature">Riposi</abbr></th></tr>
+        ${righe.map((r, i) => `<tr class="tocca" data-az="dettaglio" data-i="${i}" tabindex="0"><td><b>${esc(r.f.persona.nome)}</b></td>
+          <td>${Conti.hhmm(r.f.totale.lavoro)}</td>
+          <td>${r.paga == null ? `<button class="link" data-az="paga" data-id="${r.f.persona.id}">metti</button>` : euro(r.paga) + '/h'}</td>
+          <td><b>${r.netto == null ? '—' : euro(r.netto)}</b></td>
+          <td><b>${r.dichiarati + r.senza}</b>${r.dichiarati + r.senza ? `<br><span class="sotto" style="white-space:nowrap">${r.dichiarati} + ${r.senza}</span>` : ''}</td></tr>`).join('')}
+        <tr class="totale"><td><b>Totale</b></td><td><b>${Conti.hhmm(ore)}</b></td><td></td><td><b>${euro(tot('netto'))}</b></td><td><b>${tot('dichiarati') + tot('senza')}</b></td></tr>
+      </table></div>
+      ${manca.length ? `<p class="sotto">Manca la paga oraria di ${manca.map(r => esc(r.f.persona.nome)).join(', ')}: la metti nella sua scheda (Altro → Persone) o con «metti».</p>` : ''}
+      <p class="sotto">Netto = ore lavorate del mese × paga oraria netta, straordinari compresi alla stessa paga. Riposi: dichiarati + senza timbrature. «Senza timbrature» sono i giorni passati
+        in cui non ha timbrato e non aveva ferie, riposo o malattia. Lo vedi solo tu: ai dipendenti la paga non arriva.</p>
+      <h2 class="sezione">Ore, straordinari e assenze</h2>`;
+  }
+  function foglioPaga(pid) {
+    const p = persona(pid);
+    foglio(`La paga di ${p.nome}`, `<div class="campo"><label for="g-paga">Paga oraria netta, € all’ora</label>
+        <input id="g-paga" type="text" inputmode="decimal" autocomplete="off" value="${paghe && paghe[pid] != null ? String(paghe[pid]).replace('.', ',') : ''}" placeholder="8,00"></div>
+      <p class="sotto">La vedi solo tu, nel cruscotto del mese.</p><p class="errore" id="g-err"></p><button class="btn pieno" id="g-salva">Salva</button>`, f => {
+      f.querySelector('#g-salva').addEventListener('click', () => salvaPaga(pid, f.querySelector('#g-paga').value).then(() => { chiudiFoglio(); toast('Paga salvata.'); disegna(); })
+        .catch(e => { f.querySelector('#g-err').textContent = motivo(e); }));
+    });
+  }
+  function salvaPaga(pid, v) {
+    const n = String(v).trim() === '' ? null : Number(String(v).trim().replace('€', '').replace(',', '.'));
+    if (n != null && !(n >= 0 && n <= 500)) return Promise.reject(Object.assign(new Error('La paga oraria va da 0 a 500 €.'), { delDatabase: true }));
+    return rpc('pf_salva_paga', { p_persona: pid, p_paga: n }).then(() => { paghe = { ...(paghe || {}) }; if (n == null) delete paghe[pid]; else paghe[pid] = n; });
+  }
   function vMese() {
-    setTimeout(() => datiPerMese().then(d => {
+    setTimeout(() => Promise.all([datiPerMese(), caricaPaghe()]).then(([d, pp]) => {
       const el = document.getElementById('mese-dati'); if (!el) return;
       const ff = fogli(d);
       const soglia = Number(A.azienda.soglia_straordinari_mese || 0);
-      el.innerHTML = `<div class="scheda scorre"><table class="tab-tabella">
+      el.innerHTML = cruscotto(ff, pp) + `<div class="scheda scorre"><table class="tab-tabella">
         <tr><th>Persona</th><th>Ore</th><th><abbr title="Straordinari">Str.</abbr></th><th>Ferie</th><th><abbr title="Riposi">Rip.</abbr></th><th><abbr title="Malattia">Mal.</abbr></th></tr>
         ${ff.map((f, i) => `<tr class="tocca" data-az="dettaglio" data-i="${i}" tabindex="0"><td><b>${esc(f.persona.nome)}</b>${f.totale.mancanti ? ' <span class="chip rosso">!</span>' : ''}</td>
           <td>${Conti.hhmm(f.totale.lavoro)}</td><td${soglia && f.totale.straordinario > soglia ? ' style="color:var(--rosso);font-weight:700"' : ''}>${Conti.hhmm(f.totale.straordinario)}</td>
@@ -936,6 +987,8 @@ const PF = (() => {
       <div class="campo"><label for="p-email">E-mail (per timbrare dal suo telefono; senza, timbra dal tablet con il PIN)</label>
         <input id="p-email" type="email" inputmode="email" autocapitalize="off" value="${esc(p ? p.email || '' : '')}"></div>
       <div class="campo"><label for="p-ore">Orario di contratto, ore al giorno</label><input id="p-ore" type="number" inputmode="decimal" min="0" max="16" step="0.5" value="${p ? p.ore_giorno : 9}"></div>
+      ${p ? `<div class="campo"><label for="p-paga">Paga oraria netta, € all’ora (la vedi solo tu, nel cruscotto)</label>
+        <input id="p-paga" type="text" inputmode="decimal" autocomplete="off" value="${paghe && paghe[p.id] != null ? String(paghe[p.id]).replace('.', ',') : ''}" placeholder="8,00"></div>` : ''}
       ${p && !tit && p.id !== A.io.id ? `<label class="spunta"><input type="checkbox" id="p-attivo"${p.attivo !== false ? ' checked' : ''}> <span>Lavora ancora qui (togli la spunta quando smette: le sue ore restano)</span></label>` : ''}
       <p class="errore" id="p-err"></p>
       <button class="btn pieno" id="p-salva">Salva</button>
@@ -943,8 +996,13 @@ const PF = (() => {
         ${p.email && p.id !== A.io.id ? `<button class="btn sec" id="p-invita">${p.invitato ? 'Rimanda l’accesso' : 'Manda l’accesso'}</button>` : ''}</div>
         ${p.email && p.id !== A.io.id ? `<p class="sotto">${p.invitato ? 'Accesso mandato: entra con la sua e-mail e sceglie la sua password, poi timbra dal suo telefono.'
           : 'Manda l’accesso: gli arriva un’e-mail, entra con la sua e-mail, sceglie la password e timbra dal suo telefono.'}</p>` : ''}` : ''}`, f => {
-      f.querySelector('#p-salva').addEventListener('click', () => {
+      const campoPaga = f.querySelector('#p-paga');
+      if (campoPaga && !paghe) caricaPaghe().then(pp => { if (pp[p.id] != null && !campoPaga.value) campoPaga.value = String(pp[p.id]).replace('.', ','); });
+      f.querySelector('#p-salva').addEventListener('click', async () => {
         const att = f.querySelector('#p-attivo');
+        if (campoPaga && campoPaga.value.trim().replace(',', '.') !== String(paghe && paghe[p.id] != null ? paghe[p.id] : '')) {
+          try { await salvaPaga(p.id, campoPaga.value); } catch (e) { f.querySelector('#p-err').textContent = motivo(e); return; }
+        }
         salvaE('pf_salva_persona', { p: { id: p ? p.id : '', nome: f.querySelector('#p-nome').value, cognome: f.querySelector('#p-cognome').value,
           email: f.querySelector('#p-email').value, ore_giorno: f.querySelector('#p-ore').value, attivo: att ? att.checked : undefined } },
           p ? 'Salvato.' : 'Aggiunto. Ora dagli il PIN o mandagli l’accesso.', f);
@@ -1352,6 +1410,7 @@ const PF = (() => {
     'timbra-per-ora': () => foglioTimbraPerOra(),
     correggi: b => foglioCorreggi(A.timbrature.find(t => t.id === b.dataset.id)),
     sett: b => { settimana = Conti.piuGiorni(settimana, Number(b.dataset.n)); disegna(); },
+    paga: b => foglioPaga(b.dataset.id),
     mese: b => {
       const [a, m] = mese.split('-').map(Number); const d = new Date(Date.UTC(a, m - 1 + Number(b.dataset.n), 1));
       const nuovo = d.toISOString().slice(0, 7); if (nuovo > Conti.oggi().slice(0, 7)) return;

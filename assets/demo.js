@@ -288,6 +288,12 @@ const PFDemo = (() => {
       const area = d.azienda.verifica === 'posizione' ? 'dentro' : null;
       return { ...scrivi(io, p_verso, pu ? 'qr' : 'telefono', p_ora_telefono, p_chiave, pu ? { punto: pu.id, area } : { area }), area };
     },
+    pf_paghe() { titolare(); return d.paghe || (d.paghe = { 'p-ion': 8, 'p-raji': 8.5, 'p-samir': 8, 'p-luca': 9 }); },
+    pf_salva_paga({ p_persona, p_paga }) {
+      titolare(); d.paghe = d.paghe || {};
+      if (p_paga == null) delete d.paghe[p_persona]; else d.paghe[p_persona] = Number(p_paga);
+      salva(); return { ok: true };
+    },
     pf_salva_iscrizione() { return { ok: true }; },
     pf_togli_iscrizione() { return { ok: true }; }
   };

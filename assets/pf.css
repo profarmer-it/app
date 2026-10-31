@@ -225,3 +225,14 @@ a.btn{text-decoration:none}
 .antirobot-widget{border-radius:10px;overflow:hidden;line-height:0}
 .antirobot-widget.stretto{display:flex;justify-content:center;overflow:visible}
 .antirobot-fisso.aperto{position:fixed;left:16px;right:16px;bottom:calc(16px + var(--sotto));max-width:420px;margin:0 auto;z-index:9999;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+
+/* il cruscotto del mese (31/10/2026) */
+.cruscotto{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.cruscotto .cifra{background:var(--fondo-2);border:1px solid var(--bordo);border-radius:var(--raggio);padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.cruscotto .cifra span{font-size:12px;font-weight:700;color:var(--testo-3)}
+.cruscotto .cifra b{font-size:24px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.cruscotto .cifra small{font-size:12px;color:var(--testo-2)}
+.cruscotto .cifra.forte{background:var(--arancio);border-color:var(--arancio);color:var(--inchiostro)}
+.cruscotto .cifra.forte span{color:var(--inchiostro)}
+.tab-tabella tr.totale td{border-top:2px solid var(--bordo)}
+@media (max-width:520px){.cruscotto{grid-template-columns:1fr 1fr}.cruscotto .cifra.forte{grid-column:1 / -1;order:-1}}
