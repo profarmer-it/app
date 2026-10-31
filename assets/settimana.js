@@ -9,7 +9,9 @@
        una nota («Balvir lavoro di Hakam», «Amrik per paglia»);
      - la riga «Festa»: chi riposa quel giorno;
      - sotto, i lavori del giorno: righe senza orario o testi lunghi.
-   leggi() lo trasforma in turni-tipo, caselle, feste e lavori; avvisi()
+   Il foglio e Easy restano separati (decisione di Giulio, 31/10/2026): l'app
+   non importa il foglio. leggi() serve solo a Claude per osservarlo e fare
+   proposte. leggi() lo trasforma in turni-tipo, caselle, feste e lavori; avvisi()
    controlla una settimana (chi non riposa mai, turni sovrapposti, meno di 11
    ore di riposo, le ore della settimana). Non tocca il database.
    ========================================================================== */
