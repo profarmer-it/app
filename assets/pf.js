@@ -110,7 +110,8 @@ const PF = (() => {
       </form>
       ${msg ? `<p class="errore" role="alert">${esc(msg)}</p>` : ''}
       ${info ? `<p class="sotto" role="status">${esc(info)}</p>` : ''}
-      <p class="sotto"><a href="#" id="col-codice">Primo accesso o password dimenticata? Ricevi un codice per e-mail</a></p>
+      <button class="btn sec pieno" id="col-codice" type="button">Primo accesso</button>
+      <p class="sotto" style="text-align:center;margin-top:-4px"><a href="#" id="pw-persa">Password dimenticata?</a></p>
       <div class="scheda"><b>Non hai ancora un account?</b>
         <p class="sotto" style="margin:4px 0 10px">Easy è gratuita per i clienti piùLact: crei l'account, chiedi l'attivazione e Pro Farmer ti abilita.
           Se sei un dipendente, l'accesso te lo manda il tuo titolare.</p>
@@ -124,10 +125,14 @@ const PF = (() => {
       return (emailAccesso = e);
     };
     document.getElementById('crea').addEventListener('click', () => mostraCrea());
-    document.getElementById('col-codice').addEventListener('click', ev => {
+    const primo = ev => {
       ev.preventDefault();
-      const e = leggiEmail(); if (e) chiediCodice(e, ev.currentTarget);
-    });
+      const e = document.getElementById('email').value.trim().toLowerCase();
+      if (e) emailAccesso = e;
+      mostraPrimo();
+    };
+    document.getElementById('col-codice').addEventListener('click', primo);
+    document.getElementById('pw-persa').addEventListener('click', primo);
     document.getElementById('f-email').addEventListener('submit', ev => {
       ev.preventDefault();
       const e = leggiEmail(); if (!e) return;
@@ -139,9 +144,41 @@ const PF = (() => {
         const m = String(error.message || '');
         if (Antirobot.errore(error)) return mostraAccesso('Il controllo anti-robot non è riuscito: ricarica la pagina e riprova.');
         if (error.status === 429 || /rate|too many/i.test(m)) return mostraAccesso('Troppi tentativi: aspetta qualche minuto e riprova.');
-        if (/invalid|credentials/i.test(m)) return mostraAccesso('E-mail o password sbagliate. Se è il primo accesso o non ricordi la password, ricevi un codice per e-mail.');
+        if (/invalid|credentials/i.test(m)) return mostraAccesso('E-mail o password sbagliate. Se è il primo accesso o non ricordi la password, tocca «Primo accesso».');
         mostraAccesso(navigator.onLine === false ? 'Sei senza rete: riprova quando torna il segnale.' : 'Non riesco a controllare: riprova tra poco.');
       });
+    });
+  }
+  // Primo accesso (o password dimenticata): e-mail, codice, password. Ci porta
+  // anche il link dell'e-mail d'invito (#primo-accesso), dal 31/10/2026.
+  function mostraPrimo(msg) {
+    fermaOrologio();
+    app().className = '';
+    app().innerHTML = `<div class="accesso">
+      <img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
+      <h1>Primo accesso</h1>
+      <p class="sotto">Si fa una volta sola, in tre passi. Vale anche se hai dimenticato la password.</p>
+      <ol class="passi">
+        <li>Scrivi la tua e-mail, quella a cui è arrivato l’invito.</li>
+        <li>Ti mandiamo un codice di 6 cifre: scrivilo qui.</li>
+        <li>Scegli la tua password. Dalla volta dopo entri con e-mail e password.</li>
+      </ol>
+      <form id="f-primo" class="campo" novalidate>
+        <label for="p-email">La tua e-mail</label>
+        <input id="p-email" type="email" inputmode="email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" value="${esc(emailAccesso)}">
+        <div class="antirobot" data-antirobot aria-live="polite"></div>
+        <button class="btn pieno" style="margin-top:8px">Mandami il codice</button>
+      </form>
+      ${msg ? `<p class="errore" role="alert">${esc(msg)}</p>` : ''}
+      <p class="sotto"><a href="#" id="torna">← Ho già la password: entra</a></p>
+    </div>`;
+    document.getElementById('torna').addEventListener('click', ev => { ev.preventDefault(); history.replaceState(null, '', location.pathname + location.search); mostraAccesso(); });
+    document.getElementById('f-primo').addEventListener('submit', ev => {
+      ev.preventDefault();
+      const e = document.getElementById('p-email').value.trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return mostraPrimo('Scrivi un’e-mail completa, per esempio nome@libero.it.');
+      emailAccesso = e;
+      chiediCodice(e, ev.currentTarget.querySelector('.btn'), false, mostraPrimo);
     });
   }
   // Crea l'account: e-mail, codice, password; poi la richiesta a Pro Farmer.
@@ -170,9 +207,9 @@ const PF = (() => {
       chiediCodice(e, ev.currentTarget.querySelector('.btn'), true);
     });
   }
-  function chiediCodice(e, el, crea) {
+  function chiediCodice(e, el, crea, indietro) {
     if (el) { el.style.pointerEvents = 'none'; el.textContent = 'Mando il codice…'; }
-    const torna = crea ? mostraCrea : mostraAccesso;
+    const torna = indietro || (crea ? mostraCrea : mostraAccesso);
     Antirobot.token().then(captchaToken => collegamento().auth.signInWithOtp({ email: e, options: { shouldCreateUser: !!crea, data: crea ? { app: 'pf' } : undefined, emailRedirectTo: 'https://easy.profarmer.it/', captchaToken } })).then(({ error }) => {
       if (!error) return mostraCodice();
       const m = String(error.message || '');
@@ -180,7 +217,7 @@ const PF = (() => {
       if (error.status === 429 || /rate|seconds|too many/i.test(m)) return torna('Hai chiesto il codice da poco: aspetta un minuto e riprova.');
       if (/signup|not allowed|not found|user/i.test(m)) return crea
         ? torna('Le registrazioni non sono ancora aperte: scrivi a info@profarmer.it.')
-        : mostraAccesso('Questa e-mail non ha un account: tocca «Crea l’account», o chiedi al tuo titolare.');
+        : torna('Questa e-mail non ha un account. Se sei un dipendente, chiedi al titolare di mandarti l’accesso; se sei il titolare, torna indietro e tocca «Crea l’account».');
       torna(navigator.onLine === false ? 'Sei senza rete: riprova quando torna il segnale.' : 'Non riesco a mandare il codice: riprova tra poco.');
     });
   }
@@ -1072,8 +1109,7 @@ const PF = (() => {
       <div class="scheda"><div class="riga"><span>${esc(nome(A.io))}</span><span class="dx">${A.io.ruolo === 'titolare' ? 'Titolare' : 'Dipendente'}</span></div>
         <div class="riga"><span>Azienda</span><span class="dx">${esc(A.azienda.ragione)}</span></div>
         ${A.io.email ? `<div class="riga"><span>E-mail</span><span class="dx">${esc(A.io.email)}</span></div>` : ''}
-        <div class="riga-bottoni" style="margin-top:10px"><button class="btn sec" data-az="mio-pin">${A.io.pin ? 'Cambia il mio PIN' : 'Il mio PIN per il tablet'}</button>
-        <button class="btn sec" data-az="notifiche" id="b-notifiche">Notifiche</button>
+        <div class="riga-bottoni" style="margin-top:10px"><button class="btn sec" data-az="notifiche" id="b-notifiche">Notifiche</button>
         ${A.io.email ? '<button class="btn sec" data-az="cambia-password">Cambia la password</button>' : ''}</div></div>
       <p class="sotto">I tuoi dati: li tratta la tua azienda, e Pro Farmer per suo conto. Solo presenze, niente posizione in continuo né dati biometrici.
         <a href="https://www.iubenda.com/privacy-policy/12376136" target="_blank" rel="noopener">Informativa privacy</a>.</p>
@@ -1306,7 +1342,6 @@ const PF = (() => {
     excel: () => { const el = document.getElementById('mese-dati'); if (el && el._fogli) excel(el._fogli); },
     stampa: () => { const el = document.getElementById('mese-dati'); if (el && el._fogli) stampa(el._fogli); },
     persona: b => foglioPersona(b.dataset.id ? persona(b.dataset.id) : null),
-    'mio-pin': () => foglioPin(A.io),
     punto: b => foglioPunto(b.dataset.id ? A.punti.find(q => q.id === b.dataset.id) : null),
     'stampa-qr': b => stampaQR(A.punti.find(q => q.id === b.dataset.id)),
     regole: () => foglioRegole(),
@@ -1357,6 +1392,7 @@ const PF = (() => {
     const h = location.hash;
     if (h === '#chiosco') return mostraChiosco();
     if (/#collega=/.test(h)) return collegamentoVecchio();
+    if (h === '#primo-accesso' && !A) return mostraPrimo();
     const c = codiceDa(h);
     if (c && A) { history.replaceState(null, '', location.pathname + location.search + '#timbra'); return timbraQR(c); }
     if (A) disegna();
@@ -1370,7 +1406,9 @@ const PF = (() => {
     if (DEMO) return carica(() => { disegna(); if (qr) timbraQR(qr); });
     collegamento().auth.getSession().then(({ data }) => {
       try { localStorage.removeItem('pf-telefono'); } catch (e) {}   // il vecchio collegamento senza e-mail (fino al 30/10/2026)
-      if (!data.session) return mostraAccesso(qr ? 'Entra con la tua e-mail, poi inquadra di nuovo il QR.' : '');
+      if (!data.session) return location.hash === '#primo-accesso' ? mostraPrimo()
+        : mostraAccesso(qr ? 'Entra con la tua e-mail, poi inquadra di nuovo il QR.' : '');
+      if (location.hash === '#primo-accesso') history.replaceState(null, '', location.pathname + location.search);
       carica(() => {
         if (qr) { history.replaceState(null, '', location.pathname + '#timbra'); disegna(); timbraQR(qr); } else disegna();
       });

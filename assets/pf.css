@@ -140,6 +140,8 @@ h2.sezione{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacin
 .accesso .logo{height:40px;width:auto;align-self:flex-start;margin-bottom:18px}
 .accesso .chi-sono{margin:-12px 0 4px;overflow-wrap:break-word}
 .accesso .chi-sono a{color:var(--arancio-2);font-weight:700}
+.accesso .passi{margin:-4px 0 4px;padding-left:22px;display:flex;flex-direction:column;gap:6px;color:var(--testo-2)}
+.accesso .passi li::marker{color:var(--arancio);font-weight:800}
 .accesso h1{font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.15}
 
 /* demo */
