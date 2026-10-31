@@ -136,8 +136,10 @@ h2.sezione{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacin
   padding:12px 18px;border-radius:99px;font-weight:700;font-size:14.5px;z-index:60;box-shadow:0 10px 30px rgba(0,0,0,.35);max-width:calc(100% - 32px);text-align:center}
 
 /* accesso */
-.accesso{padding:12vh 20px 40px;display:flex;flex-direction:column;gap:14px;max-width:440px;margin:0 auto;width:100%}
+.accesso{padding:12vh 20px calc(80px + var(--sotto));display:flex;flex-direction:column;gap:14px;max-width:440px;margin:0 auto;width:100%}
 .accesso .logo{height:40px;width:auto;align-self:flex-start;margin-bottom:18px}
+.accesso .chi-sono{margin:-12px 0 4px;overflow-wrap:break-word}
+.accesso .chi-sono a{color:var(--arancio-2);font-weight:700}
 .accesso h1{font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.15}
 
 /* demo */

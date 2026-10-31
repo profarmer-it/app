@@ -278,8 +278,8 @@ const PF = (() => {
     fermaOrologio();
     app().className = '';
     app().innerHTML = `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
-      <h1>${esc(titolo)}</h1>${corpo}
-      <p class="sotto">Scritto da <b>${esc(emailAccesso)}</b> · <a href="#" data-az="esci">Esci</a></p></div>`;
+      <p class="sotto chi-sono">Sei entrato come <b>${esc(emailAccesso).replace('@', '@<wbr>')}</b><br><a href="#" data-az="esci">Esci e cambia account</a></p>
+      <h1>${esc(titolo)}</h1>${corpo}</div>`;
   }
   function formRichiesta(rifiutata, msg) {
     const v = formRichiesta.valori || {};
