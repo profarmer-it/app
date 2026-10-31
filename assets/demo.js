@@ -106,7 +106,7 @@ const PFDemo = (() => {
     return {
       azienda: { id: AZ, ragione: 'Cascina Demo', comune: 'Soresina', pausa_dopo_ore: 6, pausa_minuti: 0, ritardo_minuti: 15,
         soglia_straordinari_mese: 30, posizione_attiva: true, cliente_piulact: true, verifica: 'posizione', area: true, raggio_m: 300,
-        nomina: { versione: 'nomina-2026-11-v4', il: new Date(Date.now() - 20 * 864e5).toISOString(), da: 'Marco Rossi' } },
+        nomina: { versione: 'nomina-2026-11-v5', il: new Date(Date.now() - 20 * 864e5).toISOString(), da: 'Marco Rossi' } },
       piano: { piano: 'regalo', stato: 'attivo', fino_al: null },
       persone, turni, mansioni, timbrature, assenze: ass,
       punti: [{ id: 'q-sala', nome: 'Sala mungitura', codice: 'demo-sala-mungitura', lat: null, lon: null, raggio_m: 300, attivo: true },
@@ -361,7 +361,7 @@ const PFDemo = (() => {
       if (p.pin !== p_pin) return { ok: false, motivo: 'PIN sbagliato.' };
       return scrivi(p.id, p_verso, 'chiosco', p_ora_telefono, p_chiave_invio);
     },
-    pf_accetta_nomina() { titolare(); d.azienda.nomina = { versione: 'nomina-2026-11-v4', il: new Date().toISOString(), da: me().nome }; salva(); return { ok: true }; },
+    pf_accetta_nomina() { titolare(); d.azienda.nomina = { versione: 'nomina-2026-11-v5', il: new Date().toISOString(), da: me().nome }; salva(); return { ok: true }; },
     // il dipendente timbra dal suo account (30/10/2026): nella demo è sempre in azienda
     pf_timbra_io({ p_verso, p_ora_telefono, p_chiave, p_codice }) {
       const pu = p_codice ? d.punti.find(x => x.codice === p_codice && x.attivo) : null;

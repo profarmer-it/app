@@ -14,7 +14,7 @@
    ========================================================================== */
 
 const Documenti = (() => {
-  const VERSIONE = 'nomina-2026-11-v4';   // v4 (30/10): Cloudflare Turnstile fra i sub-responsabili; v3: il dipendente timbra dal suo account
+  const VERSIONE = 'nomina-2026-11-v5';   // v5 (31/10): niente più PIN né tablet, in più la paga oraria e i lavori del giorno; v4: Cloudflare Turnstile; v3: il dipendente timbra dal suo account
   const CONDIZIONI = 'condizioni-easy-2026-11-v1';
   const PF = 'Pro Farmer S.r.l.s., Via Milazzo 19, 26100 Cremona (CR), P.IVA 01797050190, info@profarmer.it';
   const e = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -48,14 +48,14 @@ e non li usa per finalità proprie, commerciali o di profilazione.</p>
 
 <h3>3. Interessati e dati</h3>
 <p>Interessati: i dipendenti e i collaboratori che il Titolare inserisce nell’app, e il Titolare stesso.
-Dati: nome e cognome, indirizzo e-mail (facoltativo), orario di contratto, PIN personale (conservato solo in forma non leggibile),
-orari di entrata e uscita, assenze e relativo tipo, turni, compiti, correzioni con il loro motivo; se il Titolare sceglie il controllo della posizione, l’indicazione «dentro», «fuori» o «senza posizione»
+Dati: nome e cognome, indirizzo e-mail, orario di contratto, paga oraria netta (inserita dal Titolare per il proprio riepilogo del mese, non visibile ai dipendenti),
+orari di entrata e uscita, assenze e relativo tipo, turni, lavori del giorno, compiti, correzioni con il loro motivo; se il Titolare sceglie il controllo della posizione, l’indicazione «dentro», «fuori» o «senza posizione»
 rispetto all’area dell’azienda al momento della timbratura (le coordinate non vengono conservate).
 <b>Non si trattano dati biometrici</b> e non si traccia la posizione in continuo. La malattia è indicata solo come tipo di assenza, senza diagnosi.</p>
 
 <h3>4. Obblighi del Titolare</h3>
 <p>Il Titolare: dà ai dipendenti l’informativa (l’app ne fornisce un modello); verifica, con il proprio consulente, che l’uso dell’app sia conforme
-alla disciplina del lavoro, compreso l’art. 4 della legge 300/1970; inserisce solo dati necessari; custodisce il proprio accesso e quello del tablet aziendale.</p>
+alla disciplina del lavoro, compreso l’art. 4 della legge 300/1970; inserisce solo dati necessari; custodisce il proprio accesso.</p>
 
 <h3>5. Riservatezza e sicurezza</h3>
 <p>Il Responsabile autorizza al trattamento solo persone vincolate alla riservatezza e adotta misure adeguate ai sensi dell’art. 32 GDPR, fra cui:
@@ -110,15 +110,15 @@ ${e(PF)} tratta i dati <b>per conto dell’azienda</b>, come responsabile del tr
 L’app è uno strumento di registrazione degli accessi e delle presenze ai sensi dell’art. 4, comma 2, della legge 300/1970: <b>non serve a controllare a distanza l’attività lavorativa</b>.</p>
 
 <h3>Quali dati</h3>
-<p>Nome e cognome; e-mail, se ti è stato dato l’accesso all’app (la password la scegli tu e nessuno la vede); orario di contratto; PIN personale per il tablet (conservato in forma non leggibile);
-orari di entrata e uscita; assenze e loro tipo (senza diagnosi); turni e compiti; eventuali correzioni del titolare con il motivo.</p>
+<p>Nome e cognome; e-mail, con cui entri nell’app (la password la scegli tu e nessuno la vede); orario di contratto; la paga oraria, che il titolare inserisce per il suo riepilogo del mese (nell’app la vede solo lui);
+orari di entrata e uscita; assenze e loro tipo (senza diagnosi); turni, lavori del giorno e compiti; eventuali correzioni del titolare con il motivo.</p>
 <ul>
 <li><b>Niente dati biometrici</b> (impronte, volto).</li>
 <li><b>Niente posizione in continuo.</b> ${az && (az.verifica || 'posizione') === 'posizione'
   ? 'Quando timbri dal telefono, solo in quel momento il telefono indica se sei dentro o fuori dall’area dell’azienda: si conserva solo questo esito, mai le coordinate. Se non dai il permesso della posizione la timbratura vale lo stesso, segnata «senza posizione».'
   : 'La posizione del telefono non viene usata.'}</li>
-<li>Timbri dal tuo telefono, entrando nell’app con la tua e-mail e la tua password${az && az.verifica === 'qr' ? ' e inquadrando il QR appeso in azienda' : ''}, oppure sul tablet aziendale con il tuo PIN.
-Password e PIN sono personali: non darli ai colleghi, non timbrare per loro e non farlo fare a loro per te.</li>
+<li>Timbri dal tuo telefono, entrando nell’app con la tua e-mail e la tua password${az && az.verifica === 'qr' ? ' e inquadrando il QR appeso in azienda' : ''}.
+La password è personale: non darla ai colleghi, non timbrare per loro e non farlo fare a loro per te.</li>
 </ul>
 
 <h3>Chi li vede</h3>
