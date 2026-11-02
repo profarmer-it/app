@@ -12,6 +12,24 @@
   --bordo:#4A4741; --raggio:18px;
   --sotto:env(safe-area-inset-bottom,0px); --sopra:env(safe-area-inset-top,0px);
 }
+/* Modalità chiara (2/11/2026): gli stessi ruoli, i colori invertiti. Si sceglie
+   nel Profilo (Scuro, Chiaro, Come il telefono); la scelta sta su html[data-tema]. */
+html[data-tema="chiaro"]{
+  --fondo:#F5F2EC; --fondo-2:#FFFFFF; --fondo-3:#E9E4DB; --fondo-basso:#FFFFFF;
+  --testo:#1C1B19; --testo-2:#4C4740; --testo-3:#7B746A;
+  --arancio:#F7941D; --arancio-2:#B35F05; --inchiostro:#0E0E0E;
+  --verde:#1D7F4B; --rosso:#C2382A; --giallo:#8A6700; --blu:#2463A8;
+  --bordo:#DAD3C8;
+  color-scheme:light;
+}
+html[data-tema="chiaro"] img.logo{content:url(logo-nero.png)}
+html[data-tema="chiaro"] .menu{box-shadow:0 -1px 0 var(--bordo)}
+html[data-tema="chiaro"] .scheda,html[data-tema="chiaro"] .foglio{box-shadow:0 1px 2px rgba(0,0,0,.06)}
+html[data-tema="chiaro"] .scheda.chiara{background:var(--fondo-3)}
+html[data-tema="chiaro"] .toast{background:var(--inchiostro);color:#fff}
+.tema-scelta{display:flex;gap:6px;margin-top:10px}
+.tema-scelta button{flex:1;min-height:40px;border-radius:99px;background:var(--fondo-3);color:var(--testo);font-weight:700;font-size:14px}
+.tema-scelta button[aria-pressed="true"]{background:var(--arancio);color:var(--inchiostro)}
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{font-family:Inter,system-ui,Arial,sans-serif;background:var(--fondo);color:var(--testo);line-height:1.45;

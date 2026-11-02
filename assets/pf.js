@@ -1089,11 +1089,6 @@ const PF = (() => {
         <span class="avatar">${iniziale(p)}</span><span class="chi"><b>${esc(nome(p))}${p.attivo === false ? ' · non più attivo' : ''}</b>
         <span>${p.ruolo === 'titolare' ? 'Titolare' : 'Dipendente'} · ${p.ore_giorno} ore al giorno${p.email ? (p.invitato ? ' · accesso mandato' : ' · accesso da mandare') : ' · senza e-mail'}</span></span></button>`).join('')}
         <button class="btn sec pieno" style="margin-top:10px" data-az="persona">+ Aggiungi una persona</button></div>
-      <h2 class="sezione">I QR in stalla</h2>
-      <div class="scheda">${A.punti.map(q => `<div class="riga"><span><b>${esc(q.nome)}</b>${q.attivo ? '' : ' · spento'}${q.lat ? '<br><span class="sotto">con l’area intorno</span>' : ''}</span>
-        <span class="dx"><button class="btn piccolo" data-az="stampa-qr" data-id="${q.id}">Stampa</button>
-        <button class="btn piccolo sec" data-az="punto" data-id="${q.id}">Cambia</button></span></div>`).join('') || '<p class="lista-vuota">Nessun QR: aggiungine uno, per esempio «Sala mungitura».</p>'}
-        <button class="btn sec pieno" style="margin-top:10px" data-az="punto">+ Aggiungi un QR</button></div>
       <h2 class="sezione">Mansionario</h2>
       <div class="scheda">${A.mansioni.map(m => `<button class="riga" style="width:100%;text-align:left" data-az="mansione" data-id="${m.id}">
         <span><b>${esc(m.titolo)}</b><br><span class="sotto">${m.persone.length ? m.persone.map(id => esc((persona(id) || {}).nome || '')).join(', ') : 'Tutti'}</span></span><span class="dx">›</span></button>`).join('')
@@ -1198,7 +1193,6 @@ const PF = (() => {
       <div class="campo"><label for="r-soglia">Avviso se gli straordinari del mese superano (ore)</label><input id="r-soglia" type="number" inputmode="numeric" min="0" max="200" value="${z.soglia_straordinari_mese}"></div>
       <div class="campo"><label for="r-ver">Quando si timbra dal telefono, controlla che sia in azienda con</label><select id="r-ver">
         <option value="posizione"${(z.verifica || 'posizione') === 'posizione' ? ' selected' : ''}>la posizione, solo in quel momento</option>
-        <option value="qr"${z.verifica === 'qr' ? ' selected' : ''}>il QR appeso in azienda</option>
         <option value="nessuna"${z.verifica === 'nessuna' ? ' selected' : ''}>nessun controllo</option></select></div>
       <div id="r-area-c" class="campo"${(z.verifica || 'posizione') === 'posizione' ? '' : ' hidden'}>
         <p class="sotto">L’area dell’azienda: ${z.area ? `segnata, raggio ${z.raggio_m} m.` : '<b>non ancora segnata</b>.'} Mettiti in azienda (per esempio in sala mungitura) e premi il pulsante.
@@ -1318,13 +1312,26 @@ const PF = (() => {
       <p style="white-space:pre-line;margin-top:6px;color:var(--testo-2)">${esc(m.istruzioni)}</p></div>`).join('')
       : '<p class="lista-vuota">Il titolare non ha ancora scritto i compiti.</p>';
   }
+  /* Il tema (2/11/2026): scuro (com'era), chiaro, o come il telefono. Resta sul
+     telefono (localStorage), lo applica anche index.html prima di disegnare. */
+  function temaScelto() { try { return localStorage.getItem('pf-tema') || 'scuro'; } catch (e) { return 'scuro'; } }
+  function applicaTema(t) {
+    try { localStorage.setItem('pf-tema', t); } catch (e) {}
+    const c = t === 'auto' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'chiaro' : 'scuro') : t;
+    document.documentElement.setAttribute('data-tema', c);
+    const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', c === 'chiaro' ? '#F5F2EC' : '#242320');
+  }
+  matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (temaScelto() === 'auto') applicaTema('auto'); });
   function vProfilo() {
     return `<h2 class="sezione">Il tuo profilo</h2>
       <div class="scheda"><div class="riga"><span>${esc(nome(A.io))}</span><span class="dx">${A.io.ruolo === 'titolare' ? 'Titolare' : 'Dipendente'}</span></div>
         <div class="riga"><span>Azienda</span><span class="dx">${esc(A.azienda.ragione)}</span></div>
         ${A.io.email ? `<div class="riga"><span>E-mail</span><span class="dx">${esc(A.io.email)}</span></div>` : ''}
         <div class="riga-bottoni" style="margin-top:10px"><button class="btn sec" data-az="notifiche" id="b-notifiche">Notifiche</button>
-        ${A.io.email ? '<button class="btn sec" data-az="cambia-password">Cambia la password</button>' : ''}</div></div>
+        ${A.io.email ? '<button class="btn sec" data-az="cambia-password">Cambia la password</button>' : ''}</div>
+        <div class="riga" style="margin-top:12px;border:0"><span>Aspetto</span></div>
+        <div class="tema-scelta" role="group" aria-label="Aspetto dell'app">${[['scuro', 'Scuro'], ['chiaro', 'Chiaro'], ['auto', 'Come il telefono']].map(([k, t]) =>
+          `<button data-az="tema" data-tema="${k}" aria-pressed="${temaScelto() === k}">${t}</button>`).join('')}</div></div>
       <p class="sotto">I tuoi dati: li tratta la tua azienda, e Pro Farmer per suo conto. Solo presenze, niente posizione in continuo né dati biometrici.
         <a href="https://www.iubenda.com/privacy-policy/12376136" target="_blank" rel="noopener">Informativa privacy</a>.</p>
       <button class="btn chiaro" data-az="esci">Esci</button>`;
@@ -1495,6 +1502,7 @@ const PF = (() => {
     'stampa-qr': b => stampaQR(A.punti.find(q => q.id === b.dataset.id)),
     regole: () => foglioRegole(),
     mansione: b => foglioMansione(b.dataset.id ? A.mansioni.find(m => m.id === b.dataset.id) : null),
+    tema: b => { applicaTema(b.dataset.tema); document.querySelectorAll('[data-az="tema"]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); },
     'timbra-io': b => timbraIo(b.dataset.verso)
   };
   document.addEventListener('click', ev => {
