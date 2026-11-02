@@ -569,9 +569,13 @@ const PF = (() => {
     const o = Conti.oltre(A.timbrature, A.io, A.turni, null) || { presenza: Math.floor((Date.now() - new Date(dal)) / 60000), durata: Conti.durataTurno(A.io, A.turni, Conti.oggi()), get minuti() { return this.presenza - this.durata; } };
     const fine = new Date(new Date(dal).getTime() + o.durata * 60000).toISOString();
     const oltre = o.minuti > 0;
+    // il cronometro scorre al secondo (2/11/2026): «0 min» fermo sembrava non partire
+    const sec = Math.max(0, Math.floor((Date.now() - new Date(dal)) / 1000));
+    const due = n => String(n).padStart(2, '0');
     return `<div class="contatore${oltre ? ' oltre' : ''}" id="contatore" data-dal="${dal}" role="timer" aria-live="off">
       <span class="etichetta">Al lavoro da</span>
-      <b class="tempo">${Conti.durataTesto(o.presenza)}</b>
+      <b class="tempo" aria-label="${Conti.durataTesto(o.presenza)}">${Math.floor(sec / 3600)}:${due(Math.floor(sec / 60) % 60)}:${due(sec % 60)}</b>
+      <span class="unita">ore : minuti : secondi</span>
       <span class="fine${oltre ? ' oltre' : ''}">${oltre ? `Oltre l’orario di ${Conti.durataTesto(o.minuti)}<br><span style="font-weight:500;color:var(--testo-2)">Turno finito alle ${ora(fine)}</span>`
         : `Fine turno alle ${ora(fine)} · turno di ${Conti.durataTesto(o.durata).replace(' 00 min', '')}`}</span></div>`;
   }
@@ -583,7 +587,7 @@ const PF = (() => {
       const c = document.getElementById('contatore');
       if (c) c.outerHTML = contatore(c.dataset.dal);
     };
-    orologio = setInterval(passo, 10000);
+    orologio = setInterval(passo, 1000);
   }
   function fermaOrologio() { if (orologio) clearInterval(orologio); orologio = null; }
 
