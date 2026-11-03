@@ -48,7 +48,10 @@ window.Antirobot = (() => {
       if (widget !== null) { try { ts.remove(widget); } catch (e) {} widget = null; }
       const box = posto();
       box.classList.remove('aperto');
-      box.innerHTML = '<p class="antirobot-testo">Controllo di sicurezza: spunta la casella per continuare.</p><div class="antirobot-widget"></div>';
+      // in Easy il testo e la casella seguono la lingua della pagina (3/11/2026); in Riposa resta l'italiano
+      const testo = window.Lingue ? Lingue.t(document.documentElement.lang, 'Controllo di sicurezza: spunta la casella per continuare.') : 'Controllo di sicurezza: spunta la casella per continuare.';
+      box.innerHTML = '<p class="antirobot-testo"></p><div class="antirobot-widget"></div>';
+      box.querySelector('.antirobot-testo').textContent = testo;
       const chiudi = () => box.classList.remove('aperto');
       const fine = t => { clearTimeout(attesa); chiudi(); ok(t || undefined); };
       const attesa = setTimeout(() => fine(), 60000);
@@ -57,7 +60,7 @@ window.Antirobot = (() => {
       const dove = box.querySelector('.antirobot-widget');
       dove.classList.toggle('stretto', stretto);
       widget = ts.render(dove, {
-        sitekey: CHIAVE, language: 'it', appearance: 'interaction-only', theme: tema(), size: stretto ? 'compact' : 'flexible',
+        sitekey: CHIAVE, language: (window.Lingue && document.documentElement.lang) || 'it', appearance: 'interaction-only', theme: tema(), size: stretto ? 'compact' : 'flexible',
         'before-interactive-callback': () => box.classList.add('aperto'),
         'after-interactive-callback': chiudi,
         callback: t => fine(t), 'error-callback': () => fine(), 'expired-callback': () => fine()
