@@ -10,7 +10,7 @@
    ========================================================================== */
 
 const PFDemo = (() => {
-  const CHIAVE = 'pf-demo-v1';
+  const CHIAVE = 'pf-demo-v2';   // v2 dal 3/11/2026: senza QR e tablet, con le lingue
   const AZ = 'az-demo';
   const id = () => 'x' + Math.random().toString(36).slice(2, 10);
   const err = m => { throw Object.assign(new Error(m), { delDatabase: true }); };
@@ -18,12 +18,12 @@ const PFDemo = (() => {
   // ------------------------------------------------------------ i dati finti
   function nuovi() {
     const persone = [
-      { id: 'p-marco', nome: 'Marco', cognome: 'Rossi', ruolo: 'titolare', email: 'marco@cascinademo.it', ore_giorno: 9, pin: '2580' },
-      { id: 'p-ion', nome: 'Ion', cognome: 'Popescu', ruolo: 'dipendente', email: 'ion@cascinademo.it', ore_giorno: 9, pin: '1470', nazionalita: 'Romania', lingua: 'ro' },
-      { id: 'p-raji', nome: 'Rajinder', cognome: 'Singh', ruolo: 'dipendente', email: '', ore_giorno: 9, pin: '3690', nazionalita: 'India', lingua: 'pa' },
-      { id: 'p-samir', nome: 'Samir', cognome: 'Benali', ruolo: 'dipendente', email: 'samir@cascinademo.it', ore_giorno: 9, pin: '1593', nazionalita: 'Egitto', lingua: 'ar' },
-      { id: 'p-luca', nome: 'Luca', cognome: 'Ferrari', ruolo: 'dipendente', email: 'luca@cascinademo.it', ore_giorno: 9, pin: '7531' },
-      { id: 'p-ahmed', nome: 'Ahmed', cognome: 'Khan', ruolo: 'dipendente', email: '', ore_giorno: 9, pin: '8462' }
+      { id: 'p-marco', nome: 'Marco', cognome: 'Rossi', ruolo: 'titolare', email: 'marco@cascinademo.it', ore_giorno: 9 },
+      { id: 'p-ion', nome: 'Ion', cognome: 'Popescu', ruolo: 'dipendente', email: 'ion@cascinademo.it', ore_giorno: 9, nazionalita: 'Romania', lingua: 'ro' },
+      { id: 'p-raji', nome: 'Rajinder', cognome: 'Singh', ruolo: 'dipendente', email: '', ore_giorno: 9, nazionalita: 'India', lingua: 'pa' },
+      { id: 'p-samir', nome: 'Samir', cognome: 'Benali', ruolo: 'dipendente', email: 'samir@cascinademo.it', ore_giorno: 9, nazionalita: 'Egitto', lingua: 'ar' },
+      { id: 'p-luca', nome: 'Luca', cognome: 'Ferrari', ruolo: 'dipendente', email: 'luca@cascinademo.it', ore_giorno: 9 },
+      { id: 'p-ahmed', nome: 'Ahmed', cognome: 'Khan', ruolo: 'dipendente', email: '', ore_giorno: 9 }
     ].map(p => ({ ...p, attivo: true, invitato: !!p.email, dal: '2025-01-01', al: null }));
 
     // i turni ricorrenti di una stalla da 300 vacche
@@ -82,7 +82,7 @@ const PFDemo = (() => {
           const e = istante(g, u.inizio, Math.round(caso() * 12 - 7));
           const s = istante(g, u.fine, Math.round(caso() * 25 - 3));
           if (new Date(e) > adesso) continue;
-          const modo = p.email ? 'qr' : 'chiosco';
+          const modo = 'telefono';
           timbrature.push({ id: id(), persona: p.id, verso: 'entrata', quando: e, modo, valida: true });
           // oggi: chi è ancora nel turno non ha l'uscita
           if (new Date(s) <= adesso) timbrature.push({ id: id(), persona: p.id, verso: 'uscita', quando: s, modo, valida: true });
@@ -99,9 +99,9 @@ const PFDemo = (() => {
     }
     // a qualunque ora si apra la demo, in stalla c'è qualcuno
     if (!persone.some(p => Conti.dentro(timbrature, p.id))) {
-      timbrature.push({ id: id(), persona: 'p-ion', verso: 'entrata', quando: new Date(adesso - 52 * 60e3).toISOString(), modo: 'qr', valida: true });
-      timbrature.push({ id: id(), persona: 'p-raji', verso: 'entrata', quando: new Date(adesso - 47 * 60e3).toISOString(), modo: 'chiosco', valida: true });
-      timbrature.push({ id: id(), persona: 'p-samir', verso: 'entrata', quando: new Date(adesso - 15 * 60e3).toISOString(), modo: 'qr', valida: true });
+      timbrature.push({ id: id(), persona: 'p-ion', verso: 'entrata', quando: new Date(adesso - 52 * 60e3).toISOString(), modo: 'telefono', valida: true });
+      timbrature.push({ id: id(), persona: 'p-raji', verso: 'entrata', quando: new Date(adesso - 47 * 60e3).toISOString(), modo: 'telefono', valida: true });
+      timbrature.push({ id: id(), persona: 'p-samir', verso: 'entrata', quando: new Date(adesso - 15 * 60e3).toISOString(), modo: 'telefono', valida: true });
     }
     return {
       azienda: { id: AZ, ragione: 'Cascina Demo', comune: 'Soresina', pausa_dopo_ore: 6, pausa_minuti: 0, ritardo_minuti: 15,
@@ -109,9 +109,6 @@ const PFDemo = (() => {
         nomina: { versione: 'nomina-2026-11-v5', il: new Date(Date.now() - 20 * 864e5).toISOString(), da: 'Marco Rossi' } },
       piano: { piano: 'regalo', stato: 'attivo', fino_al: null },
       persone, turni, mansioni, timbrature, assenze: ass,
-      punti: [{ id: 'q-sala', nome: 'Sala mungitura', codice: 'demo-sala-mungitura', lat: null, lon: null, raggio_m: 300, attivo: true },
-              { id: 'q-uff', nome: 'Ufficio', codice: 'demo-ufficio', lat: null, lon: null, raggio_m: 300, attivo: true }],
-      dispositivi: [{ id: 'd-tablet', nome: 'Tablet in sala mungitura', attivo: true, ultimo_uso: new Date().toISOString() }],
       settimane: [Conti.lunediDi(oggi)]
     };
   }
@@ -146,7 +143,6 @@ const PFDemo = (() => {
   const persona = pid => d.persone.find(p => p.id === pid);
   const me = () => persona(io);
   const titolare = () => { if (me().ruolo !== 'titolare') err('Solo il titolare può farlo.'); };
-  const dalChiosco = k => { if (k !== 'demo.tablet') err('Questo tablet non è più collegato.'); };
 
   function verso(pid, v) {
     if (v) return v;
@@ -170,13 +166,12 @@ const PFDemo = (() => {
       const tit = me().ruolo === 'titolare';
       const pubblica = p => ({ id: p.id, nome: p.nome, cognome: p.cognome, ruolo: p.ruolo, lingua: p.lingua || 'it',
         ...(tit ? { nazionalita: p.nazionalita || '' } : {}),
-        ...(tit ? { email: p.email, ore_giorno: p.ore_giorno, pin: !!p.pin, attivo: p.attivo, invitato: p.invitato, dal: p.dal, al: p.al } : {}) });
+        ...(tit ? { email: p.email, ore_giorno: p.ore_giorno, attivo: p.attivo, invitato: p.invitato, dal: p.dal, al: p.al } : {}) });
       return {
         ok: true, attiva: true, demo: true,
-        io: { ...pubblica(me()), email: me().email, ore_giorno: me().ore_giorno, pin: !!me().pin },
+        io: { ...pubblica(me()), email: me().email, ore_giorno: me().ore_giorno },
         azienda: d.azienda, piano: d.piano,
         persone: d.persone.filter(p => p.attivo || tit).map(pubblica),
-        punti: tit ? d.punti : [], dispositivi: tit ? d.dispositivi : [],
         timbrature: tit ? d.timbrature : d.timbrature.filter(t => t.persona === io && t.valida),
         assenze: d.assenze.filter(a => a.stato !== 'annullata' && (tit || a.persona === io || a.stato === 'approvata'))
           .map(a => tit || a.persona === io ? a : { id: a.id, persona: a.persona, tipo: 'assente', dal: a.dal, al: a.al, stato: a.stato }),
@@ -190,11 +185,6 @@ const PFDemo = (() => {
     pf_mese() {
       titolare();
       return { timbrature: d.timbrature.filter(t => t.valida), assenze: d.assenze.filter(a => a.stato === 'approvata'), correzioni: 0 };
-    },
-    pf_timbra({ p_codice, p_verso, p_ora_telefono, p_chiave }) {
-      const pu = d.punti.find(x => x.codice === p_codice && x.attivo);
-      if (!pu) err('Questo QR non è della tua azienda, o non vale più.');
-      return scrivi(io, p_verso, 'qr', p_ora_telefono, p_chiave, { punto: pu.id });
     },
     pf_timbra_per({ p_persona, p_verso, p_quando, p_motivo }) {
       titolare();
@@ -215,12 +205,6 @@ const PFDemo = (() => {
         modo: 'correzione', sostituisce: t.id, annullata: !!p_annulla, motivo: p_motivo.trim(), valida: !p_annulla });
       salva(); return { ok: true };
     },
-    pf_imposta_pin({ p_persona, p_pin }) {
-      if (!/^\d{4}$/.test(p_pin)) err('Il PIN è di 4 cifre.');
-      if (['0000', '1111', '1234', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999', '4321'].includes(p_pin)) err('Questo PIN è troppo facile: scegline un altro.');
-      if (p_persona !== io) titolare();
-      persona(p_persona).pin = p_pin; salva(); return { ok: true };
-    },
     pf_salva_persona({ p }) {
       titolare();
       if (!(p.nome || '').trim()) err('Manca il nome.');
@@ -232,21 +216,8 @@ const PFDemo = (() => {
         salva(); return { ok: true, id: x.id };
       }
       const x = { id: id(), nome: p.nome.trim(), cognome: (p.cognome || '').trim(), ruolo: 'dipendente', email: (p.email || '').trim().toLowerCase(),
-        ore_giorno: Number(p.ore_giorno || 9), nazionalita: p.nazionalita || '', lingua: p.lingua || 'it', attivo: true, invitato: false, dal: Conti.oggi(), al: null, pin: null };
+        ore_giorno: Number(p.ore_giorno || 9), nazionalita: p.nazionalita || '', lingua: p.lingua || 'it', attivo: true, invitato: false, dal: Conti.oggi(), al: null };
       d.persone.push(x); salva(); return { ok: true, id: x.id };
-    },
-    pf_salva_punto({ p }) {
-      titolare();
-      if (p.id) {
-        const x = d.punti.find(q => q.id === p.id);
-        Object.assign(x, { nome: p.nome, lat: p.lat === '' ? null : p.lat ?? x.lat, lon: p.lon === '' ? null : p.lon ?? x.lon,
-          raggio_m: Number(p.raggio_m || x.raggio_m) });
-        if (p.attivo !== undefined) x.attivo = !!p.attivo;
-        if (p.nuovo_codice) x.codice = 'demo-' + id();
-        salva(); return { ok: true, id: x.id };
-      }
-      const x = { id: id(), nome: p.nome, codice: 'demo-' + id(), lat: null, lon: null, raggio_m: 300, attivo: true };
-      d.punti.push(x); salva(); return { ok: true, id: x.id };
     },
     pf_salva_regole({ p }) { titolare(); Object.assign(d.azienda, p); salva(); return { ok: true }; },
     pf_chiedi_assenza({ p }) {
@@ -344,30 +315,11 @@ const PFDemo = (() => {
       else d.mansioni.push({ id: id(), titolo: p.titolo, istruzioni: p.istruzioni || '', persone: p.persone || [] });
       salva(); return { ok: true };
     },
-    pf_nuovo_dispositivo({ p_nome }) {
-      titolare();
-      d.dispositivi.push({ id: id(), nome: p_nome || 'Tablet di stalla', attivo: true, ultimo_uso: null });
-      salva(); return { ok: true, chiave: 'demo.tablet' };
-    },
-    pf_togli_dispositivo({ p_id }) { titolare(); d.dispositivi.find(x => x.id === p_id).attivo = false; salva(); return { ok: true }; },
-    pf_chiosco_persone({ p_chiave }) {
-      dalChiosco(p_chiave);
-      return { ok: true, azienda: d.azienda.ragione, persone: d.persone.filter(p => p.attivo).map(p => ({
-        id: p.id, nome: p.nome, cognome: (p.cognome || '').slice(0, 1), pin: !!p.pin, dentro: !!Conti.dentro(d.timbrature, p.id) })) };
-    },
-    pf_chiosco_timbra({ p_chiave, p_persona, p_pin, p_verso, p_ora_telefono, p_chiave_invio }) {
-      dalChiosco(p_chiave);
-      const p = persona(p_persona);
-      if (!p.pin) err('Non hai ancora il PIN: chiedilo al titolare.');
-      if (p.pin !== p_pin) return { ok: false, motivo: 'PIN sbagliato.' };
-      return scrivi(p.id, p_verso, 'chiosco', p_ora_telefono, p_chiave_invio);
-    },
     pf_accetta_nomina() { titolare(); d.azienda.nomina = { versione: 'nomina-2026-11-v5', il: new Date().toISOString(), da: me().nome }; salva(); return { ok: true }; },
     // il dipendente timbra dal suo account (30/10/2026): nella demo è sempre in azienda
-    pf_timbra_io({ p_verso, p_ora_telefono, p_chiave, p_codice }) {
-      const pu = p_codice ? d.punti.find(x => x.codice === p_codice && x.attivo) : null;
+    pf_timbra_io({ p_verso, p_ora_telefono, p_chiave }) {
       const area = d.azienda.verifica === 'posizione' ? 'dentro' : null;
-      return { ...scrivi(io, p_verso, pu ? 'qr' : 'telefono', p_ora_telefono, p_chiave, pu ? { punto: pu.id, area } : { area }), area };
+      return { ...scrivi(io, p_verso, 'telefono', p_ora_telefono, p_chiave, { area }), area };
     },
     pf_paghe() { titolare(); return d.paghe || (d.paghe = { 'p-ion': 8, 'p-raji': 8.5, 'p-samir': 8, 'p-luca': 9 }); },
     pf_salva_paga({ p_persona, p_paga }) {
@@ -389,8 +341,7 @@ const PFDemo = (() => {
     },
     chi: () => io,
     diventa(pid) { io = pid; },
-    persone: () => d.persone.map(p => ({ id: p.id, nome: p.nome, ruolo: p.ruolo, pin: p.pin })),
-    ricomincia() { d = nuovi(); salva(); },
-    codicePunto: () => d.punti[0].codice
+    persone: () => d.persone.map(p => ({ id: p.id, nome: p.nome, ruolo: p.ruolo })),
+    ricomincia() { d = nuovi(); salva(); }
   };
 })();
