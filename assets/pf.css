@@ -175,13 +175,6 @@ h2.sezione{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacin
 .barra-demo select{background:#fff;border:0;border-radius:8px;padding:4px 6px;font-weight:700;font-size:13px;color:var(--inchiostro)}
 .barra-demo button{text-decoration:underline;font-weight:700}
 
-/* lettore del QR */
-.lettore{position:fixed;inset:0;background:#000;z-index:50;display:flex;flex-direction:column}
-.lettore video{flex:1;width:100%;object-fit:cover;min-height:0}
-.lettore .mirino{position:absolute;left:50%;top:42%;width:min(68vw,280px);aspect-ratio:1;transform:translate(-50%,-50%);
-  border:4px solid var(--arancio);border-radius:24px;box-shadow:0 0 0 100vmax rgba(0,0,0,.45)}
-.lettore .giu{padding:16px 16px calc(16px + var(--sotto));display:flex;flex-direction:column;gap:10px;background:var(--fondo)}
-
 /* esito della timbratura */
 .esito{position:fixed;inset:0;z-index:55;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
   padding:24px;text-align:center;background:var(--fondo)}
@@ -191,23 +184,7 @@ h2.sezione{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacin
 .esito h2{font-size:28px;font-weight:800}
 .esito p{color:var(--testo-2);font-size:17px}
 
-/* tablet di stalla */
-.chiosco{width:100%;min-height:100dvh;display:flex;flex-direction:column;padding:20px 20px calc(20px + var(--sotto));gap:16px;max-width:1100px;margin:0 auto}
-.chiosco .alto{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
-.chiosco .orologio{text-align:left;font-size:56px;margin:0}
-.griglia-persone{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
-.griglia-persone button{background:var(--fondo-2);border-radius:20px;padding:18px 12px;display:flex;flex-direction:column;align-items:center;gap:10px;
-  font-weight:800;font-size:18px;min-height:150px;justify-content:center}
-.griglia-persone .avatar{width:64px;height:64px;border-radius:50%;background:var(--fondo-3);display:grid;place-items:center;font-size:26px;position:relative}
-.griglia-persone .avatar.dentro::after{content:"";position:absolute;right:0;bottom:0;width:18px;height:18px;border-radius:50%;background:var(--verde);border:3px solid var(--fondo-2)}
-.griglia-persone small{font-size:13px;font-weight:600;color:var(--testo-2)}
-.tastierino{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:340px;width:100%;margin:0 auto}
-.tastierino button{height:68px;border-radius:18px;background:var(--fondo-3);font-size:28px;font-weight:800}
-.puntini{display:flex;gap:14px;justify-content:center;margin:6px 0 10px}
-.puntini i{width:16px;height:16px;border-radius:50%;border:2px solid var(--testo-2)}
-.puntini i.pieno{background:var(--arancio);border-color:var(--arancio)}
-
-/* foglio da stampare (QR e riepilogo) */
+/* foglio da stampare (riepilogo e documenti) */
 @media print{
   body{background:#fff;color:#000}
   #app,.menu,.velo,.toast{display:none!important}
@@ -284,3 +261,42 @@ a.btn{text-decoration:none}
 .spunta-nota .nota{flex:0 1 45%;min-width:0;padding:6px 8px;font-size:14px}
 .lavoro{font-size:14px;color:var(--testo-2);border-left:3px solid var(--arancio);padding:2px 0 2px 10px;margin:6px 0;white-space:pre-line}
 .avvisi-box{border:1px solid var(--arancio)}
+.cifra-stalla{display:flex;flex-direction:column;gap:2px;color:inherit}
+.cifra-stalla b{font-size:44px;font-weight:800;letter-spacing:-.02em;line-height:1.05;font-variant-numeric:tabular-nums}
+.cifra-stalla b small{font-size:18px;font-weight:700;opacity:.75}
+.riga.cosa{color:inherit;text-decoration:none}
+.riga.cosa:last-child{border-bottom:0}
+.btn.enorme.uscita{background:var(--testo);color:var(--fondo)}
+.contatore .tempo{font-size:44px}
+.vista-giorno{display:none;flex-direction:column;gap:12px}
+.giorni-scelta{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.giorni-scelta button{display:flex;flex-direction:column;align-items:center;padding:6px 0;border-radius:12px;background:var(--fondo-2);font-weight:800;font-size:17px;min-height:52px}
+.giorni-scelta button small{font-size:11px;font-weight:600;color:var(--testo-2);text-transform:uppercase}
+.giorni-scelta button.oggi small{color:var(--arancio)}
+.giorni-scelta button[aria-selected="true"]{background:var(--arancio);color:var(--inchiostro)}
+.giorni-scelta button[aria-selected="true"] small{color:var(--inchiostro)}
+.riga-giorno{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;padding:11px 0;border-bottom:1px solid var(--bordo);min-height:52px}
+.riga-giorno:last-child{border-bottom:0}
+.riga-giorno>span:first-child{display:flex;flex-direction:column;min-width:0}
+.riga-giorno small{font-size:12.5px;color:var(--testo-2);font-weight:500}
+.riga-giorno .chi{text-align:right;font-weight:700;font-size:14.5px}
+.riga-giorno .vuota{color:var(--arancio);font-weight:700}
+@media (max-width:699px){.vista-giorno{display:flex}.griglia{display:none}}
+/* lingua (3/11/2026) */
+.testa-accesso{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.scelta-lingua{background:var(--fondo-2);color:var(--testo);border:1px solid var(--bordo);border-radius:99px;padding:8px 12px;font:inherit;font-size:14px;max-width:60%}
+.riga .scelta-lingua{max-width:100%}
+[dir="rtl"] .riga .dx,[dir="rtl"] .riga-giorno .chi{text-align:left}
+[dir="rtl"] .contatore .tempo,[dir="rtl"] .orologio{direction:ltr;unicode-bidi:isolate}
+
+/* sul computer il menu sta a sinistra (3/11/2026) */
+@media (min-width:1000px){
+  body{padding-left:224px}
+  .menu{top:0;right:auto;width:224px;padding:24px 12px;border-right:1px solid var(--bordo)}
+  .menu .dentro{flex-direction:column;justify-content:flex-start;gap:4px;max-width:none}
+  .menu a{flex:none;flex-direction:row;justify-content:flex-start;gap:12px;font-size:15px;padding:10px 14px;min-height:48px}
+  .menu a.su{background:var(--fondo-2)}
+  .menu .pallino{position:static;margin:0 0 0 auto}
+  .corpo{padding-bottom:40px}
+  #app.largo{max-width:1100px}
+}

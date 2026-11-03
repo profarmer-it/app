@@ -23,13 +23,11 @@ const PF = (() => {
   };
   const VAPID = 'BBMiPSY2ADgUWEiZE7vpPz6aJLnfxfM-rUjhZKuNp2nQh8nv7NSMChvyL_MMjIEUnc1c3CZO_OflRINeQX_nZo4';
   const LIB = {
-    jsqr: 'assets/vendor/jsQR-1.4.0.js',
-    qr: 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js',
     xlsx: 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
   };
   const INDIRIZZO = 'https://easy.profarmer.it/';
   const DEMO = new URLSearchParams(location.search).has('demo');
-  const K_CODA = 'pf-coda', K_CHIOSCO = 'pf-chiosco';
+  const K_CODA = 'pf-coda';
   const MANSIONI = ['Mungitura', 'Alimentazione', 'Pulizia cuccette', 'Vitelli', 'Manutenzione', 'Altro'];
   const TIPI = { ferie: 'Ferie', riposo: 'Riposo', permesso: 'Permesso', malattia: 'Malattia', assente: 'Assente' };
   const GIORNI = ['', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
@@ -37,15 +35,32 @@ const PF = (() => {
 
   let sb = null, A = null, emailAccesso = '', orologio = null;
   let settimana = Conti.lunediDi(Conti.oggi()), mese = Conti.oggi().slice(0, 7), datiMese = null;
-  let paghe = null;                         // { persona: paga oraria netta }, solo per il titolare (dal 31/10/2026)
+  let paghe = null;
+  let giornoVisto = Conti.oggi();          // il giorno della settimana mostrato sul telefono                         // { persona: paga oraria netta }, solo per il titolare (dal 31/10/2026)
   const app = () => document.getElementById('app');
+  /* La lingua (3/11/2026): prima dell'accesso quella scelta sul telefono o del
+     telefono; dopo, quella della persona. Il titolare usa l'italiano. */
+  let LINGUA = 'it';
+  const L = (s, v) => Lingue.t(LINGUA, s, v);
+  function impostaLingua(l, ricorda) {
+    LINGUA = Lingue.info(l).id;
+    if (ricorda) scrivi('pf-lingua', LINGUA);
+    document.documentElement.lang = LINGUA;
+    document.documentElement.dir = Lingue.info(LINGUA).rtl ? 'rtl' : 'ltr';
+  }
+  impostaLingua(leggi('pf-lingua', null) || Lingue.delTelefono());
+  const sceltaLingua = id => `<select id="${id}" class="scelta-lingua" aria-label="Lingua / Language">${Lingue.ELENCO.map(l =>
+    `<option value="${l.id}"${l.id === LINGUA ? ' selected' : ''}>${esc(l.nome)}</option>`).join('')}</select>`;
 
   /* ---------------------------------------------------------------- utilità */
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const nome = p => p ? `${p.nome}${p.cognome ? ' ' + p.cognome : ''}` : '';
   const iniziale = p => (p && p.nome ? p.nome[0] : '?').toUpperCase();
   const dataIt = g => { const [a, m, d] = g.split('-'); return `${+d}/${+m}`; };
-  const dataLunga = g => { const d = new Date(g + 'T12:00:00Z'); return `${GIORNI[Conti.giornoSettimana(g)].toLowerCase()} ${d.getUTCDate()} ${MESI[d.getUTCMonth()]}`; };
+  const dataLunga = g => { if (LINGUA !== 'it') return Lingue.dataLunga(LINGUA, g); const d = new Date(g + 'T12:00:00Z'); return `${GIORNI[Conti.giornoSettimana(g)].toLowerCase()} ${d.getUTCDate()} ${MESI[d.getUTCMonth()]}`; };
+  const nomeGiorno = g => LINGUA === 'it' ? GIORNI[Conti.giornoSettimana(g)] : Lingue.giorno(LINGUA, g);
+  const tipoT = k => L(TIPI[k]);
+  const bdi = t => `<bdi dir="ltr">${t}</bdi>`;     // orari e durate restano da sinistra anche in arabo e urdu
   const ora = iso => Conti.roma(iso).ora;
   const titolare = () => A && A.io.ruolo === 'titolare';
   const persona = id => A.persone.find(p => p.id === id);
@@ -98,21 +113,22 @@ const PF = (() => {
     fermaOrologio();
     app().className = '';
     app().innerHTML = `<div class="accesso">
-      <img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
-      <h1>Entra nell'app Pro Farmer</h1>
+      <div class="testa-accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">${sceltaLingua('lingua-accesso')}</div>
+      <h1>${L('Entra nell’app Pro Farmer')}</h1>
       <form id="f-email" class="campo" novalidate>
-        <label for="email">La tua e-mail</label>
+        <label for="email">${L('La tua e-mail')}</label>
         <input id="email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" value="${esc(emailAccesso)}">
-        <label for="password" style="margin-top:8px">La password</label>
+        <label for="password" style="margin-top:8px">${L('La password')}</label>
         <div class="campo-pw"><input id="password" name="password" type="password" autocomplete="current-password" enterkeyhint="go">
-          <button type="button" class="mostra-pw" aria-label="Mostra la password" aria-pressed="false">Mostra</button></div>
+          <button type="button" class="mostra-pw" aria-label="${L('Mostra')}" aria-pressed="false">${L('Mostra')}</button></div>
         <div class="antirobot" data-antirobot aria-live="polite"></div>
-        <button class="btn pieno" style="margin-top:8px">Entra</button>
+        <button class="btn pieno" style="margin-top:8px">${L('Entra')}</button>
       </form>
       ${msg ? `<p class="errore" role="alert">${esc(msg)}</p>` : ''}
       ${info ? `<p class="sotto" role="status">${esc(info)}</p>` : ''}
-      <button class="btn sec pieno" id="col-codice" type="button">Primo accesso</button>
-      <p class="sotto" style="text-align:center;margin-top:-4px"><a href="#" id="pw-persa">Password dimenticata?</a></p>
+      <button class="btn sec pieno" id="col-codice" type="button">${L('Primo accesso')}</button>
+      <p class="sotto" style="text-align:center;margin-top:-4px"><a href="#" id="pw-persa">${L('Password dimenticata?')}</a></p>
+      ${LINGUA !== 'it' ? `<p class="sotto">${L('Se sei un dipendente, l’accesso te lo manda il tuo titolare.')}</p>` : ''}
       <div class="scheda"><b>Non hai ancora un account?</b>
         <p class="sotto" style="margin:4px 0 10px">Easy è gratuita per i clienti piùLact: crei l'account, chiedi l'attivazione e Pro Farmer ti abilita.
           Se sei un dipendente, l'accesso te lo manda il tuo titolare.</p>
@@ -122,7 +138,7 @@ const PF = (() => {
     occhio();
     const leggiEmail = () => {
       const e = document.getElementById('email').value.trim().toLowerCase();
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) { mostraAccesso('Scrivi un’e-mail completa, per esempio nome@libero.it.'); return null; }
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) { mostraAccesso(L('Scrivi un’e-mail completa, per esempio nome@libero.it.')); return null; }
       return (emailAccesso = e);
     };
     document.getElementById('crea').addEventListener('click', () => mostraCrea());
@@ -138,15 +154,15 @@ const PF = (() => {
       ev.preventDefault();
       const e = leggiEmail(); if (!e) return;
       const pw = document.getElementById('password').value;
-      if (!pw) return mostraAccesso('Scrivi la password. Se non l’hai ancora scelta, tocca «Primo accesso».');
-      const b = ev.currentTarget.querySelector('.btn'); b.disabled = true; b.textContent = 'Controllo…';
+      if (!pw) return mostraAccesso(L('Scrivi la password. Se non l’hai ancora scelta, tocca «Primo accesso».'));
+      const b = ev.currentTarget.querySelector('.btn'); b.disabled = true; b.textContent = L('Controllo…');
       Antirobot.token().then(captchaToken => collegamento().auth.signInWithPassword({ email: e, password: pw, options: { captchaToken } })).then(({ error }) => {
         if (!error) return carica();
         const m = String(error.message || '');
         if (Antirobot.errore(error)) return mostraAccesso('Il controllo anti-robot non è riuscito: ricarica la pagina e riprova.');
         if (error.status === 429 || /rate|too many/i.test(m)) return mostraAccesso('Troppi tentativi: aspetta qualche minuto e riprova.');
-        if (/invalid|credentials/i.test(m)) return mostraAccesso('E-mail o password sbagliate. Se è il primo accesso o non ricordi la password, tocca «Primo accesso».');
-        mostraAccesso(navigator.onLine === false ? 'Sei senza rete: riprova quando torna il segnale.' : 'Non riesco a controllare: riprova tra poco.');
+        if (/invalid|credentials/i.test(m)) return mostraAccesso(L('E-mail o password sbagliate. Se è il primo accesso o non ricordi la password, tocca «Primo accesso».'));
+        mostraAccesso(navigator.onLine === false ? L('Sei senza rete: riprova quando torna il segnale.') : 'Non riesco a controllare: riprova tra poco.');
       });
     });
   }
@@ -157,27 +173,27 @@ const PF = (() => {
     app().className = '';
     app().innerHTML = `<div class="accesso">
       <img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
-      <h1>Primo accesso</h1>
-      <p class="sotto">Si fa una volta sola, in tre passi. Vale anche se hai dimenticato la password.</p>
+      <h1>${L('Primo accesso')}</h1>
+      <p class="sotto">${L('Si fa una volta sola, in tre passi. Vale anche se hai dimenticato la password.')}</p>
       <ol class="passi">
-        <li>Scrivi la tua e-mail, quella a cui è arrivato l’invito.</li>
-        <li>Ti mandiamo un codice di 6 cifre: scrivilo qui.</li>
-        <li>Scegli la tua password. Dalla volta dopo entri con e-mail e password.</li>
+        <li>${L('Scrivi la tua e-mail, quella a cui è arrivato l’invito.')}</li>
+        <li>${L('Ti mandiamo un codice di 6 cifre: scrivilo qui.')}</li>
+        <li>${L('Scegli la tua password. Dalla volta dopo entri con e-mail e password.')}</li>
       </ol>
       <form id="f-primo" class="campo" novalidate>
-        <label for="p-email">La tua e-mail</label>
+        <label for="p-email">${L('La tua e-mail')}</label>
         <input id="p-email" type="email" inputmode="email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" value="${esc(emailAccesso)}">
         <div class="antirobot" data-antirobot aria-live="polite"></div>
-        <button class="btn pieno" style="margin-top:8px">Mandami il codice</button>
+        <button class="btn pieno" style="margin-top:8px">${L('Mandami il codice')}</button>
       </form>
       ${msg ? `<p class="errore" role="alert">${esc(msg)}</p>` : ''}
-      <p class="sotto"><a href="#" id="torna">← Ho già la password: entra</a></p>
+      <p class="sotto"><a href="#" id="torna">${L('← Ho già la password: entra')}</a></p>
     </div>`;
     document.getElementById('torna').addEventListener('click', ev => { ev.preventDefault(); history.replaceState(null, '', location.pathname + location.search); mostraAccesso(); });
     document.getElementById('f-primo').addEventListener('submit', ev => {
       ev.preventDefault();
       const e = document.getElementById('p-email').value.trim().toLowerCase();
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return mostraPrimo('Scrivi un’e-mail completa, per esempio nome@libero.it.');
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return mostraPrimo(L('Scrivi un’e-mail completa, per esempio nome@libero.it.'));
       emailAccesso = e;
       chiediCodice(e, ev.currentTarget.querySelector('.btn'), false, mostraPrimo);
     });
@@ -209,42 +225,42 @@ const PF = (() => {
     });
   }
   function chiediCodice(e, el, crea, indietro) {
-    if (el) { el.style.pointerEvents = 'none'; el.textContent = 'Mando il codice…'; }
+    if (el) { el.style.pointerEvents = 'none'; el.textContent = L('Mando il codice…'); }
     const torna = indietro || (crea ? mostraCrea : mostraAccesso);
     Antirobot.token().then(captchaToken => collegamento().auth.signInWithOtp({ email: e, options: { shouldCreateUser: !!crea, data: crea ? { app: 'pf' } : undefined, emailRedirectTo: 'https://easy.profarmer.it/', captchaToken } })).then(({ error }) => {
       if (!error) return mostraCodice();
       const m = String(error.message || '');
       if (Antirobot.errore(error)) return torna('Il controllo anti-robot non è riuscito: ricarica la pagina e riprova.');
-      if (error.status === 429 || /rate|seconds|too many/i.test(m)) return torna('Hai chiesto il codice da poco: aspetta un minuto e riprova.');
+      if (error.status === 429 || /rate|seconds|too many/i.test(m)) return torna(L('Hai chiesto il codice da poco: aspetta un minuto e riprova.'));
       if (/signup|not allowed|not found|user/i.test(m)) return crea
         ? torna('Le registrazioni non sono ancora aperte: scrivi a info@profarmer.it.')
-        : torna('Questa e-mail non ha un account. Se sei un dipendente, chiedi al titolare di mandarti l’accesso; se sei il titolare, torna indietro e tocca «Crea l’account».');
-      torna(navigator.onLine === false ? 'Sei senza rete: riprova quando torna il segnale.' : 'Non riesco a mandare il codice: riprova tra poco.');
+        : torna(L('Questa e-mail non ha un account. Se sei un dipendente, chiedi al titolare di mandarti l’accesso; se sei il titolare, torna indietro e tocca «Crea l’account».'));
+      torna(navigator.onLine === false ? L('Sei senza rete: riprova quando torna il segnale.') : 'Non riesco a mandare il codice: riprova tra poco.');
     });
   }
   function mostraCodice(msg) {
     app().innerHTML = `<div class="accesso">
       <img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
-      <h1>Controlla la posta</h1>
-      <p class="sotto">Ti abbiamo mandato un codice di 6 cifre a <b>${esc(emailAccesso)}</b>. Vale 15 minuti. Se non lo trovi, guarda nella posta indesiderata.</p>
+      <h1>${L('Controlla la posta')}</h1>
+      <p class="sotto">${L('Ti abbiamo mandato un codice di 6 cifre a {email}. Vale 15 minuti. Se non lo trovi, guarda nella posta indesiderata.', { email: `<b>${esc(emailAccesso)}</b>` })}</p>
       <form id="f-codice" class="campo" novalidate>
-        <label for="codice">Il codice</label>
+        <label for="codice">${L('Il codice')}</label>
         <input id="codice" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" enterkeyhint="go" placeholder="123456">
-        <button class="btn pieno" style="margin-top:8px">Avanti</button>
+        <button class="btn pieno" style="margin-top:8px">${L('Avanti')}</button>
       </form>
       ${msg ? `<p class="errore" role="alert">${esc(msg)}</p>` : ''}
-      <p class="sotto"><a href="#" id="altra">← Torna all'accesso</a></p>
+      <p class="sotto"><a href="#" id="altra">${L('← Torna all’accesso')}</a></p>
     </div>`;
     document.getElementById('altra').addEventListener('click', ev => { ev.preventDefault(); mostraAccesso(); });
     const c = document.getElementById('codice'); c.focus();
     document.getElementById('f-codice').addEventListener('submit', ev => {
       ev.preventDefault();
       const codice = c.value.replace(/\D/g, '');
-      if (codice.length !== 6) return mostraCodice('Il codice ha 6 cifre.');
-      const b = ev.currentTarget.querySelector('button'); b.disabled = true; b.textContent = 'Controllo…';
+      if (codice.length !== 6) return mostraCodice(L('Il codice ha 6 cifre.'));
+      const b = ev.currentTarget.querySelector('button'); b.disabled = true; b.textContent = L('Controllo…');
       collegamento().auth.verifyOtp({ email: emailAccesso, token: codice, type: 'email' }).then(({ error }) => {
         if (error) return mostraCodice(/expired|invalid/i.test(error.message)
-          ? 'Codice sbagliato o scaduto. Ricontrolla, o chiedine uno nuovo.' : 'Non riesco a controllare il codice: riprova tra poco.');
+          ? L('Codice sbagliato o scaduto. Ricontrolla, o chiedine uno nuovo.') : 'Non riesco a controllare il codice: riprova tra poco.');
         // dopo il codice la password si sceglie sempre: chi avesse registrato prima
         // questa e-mail con una password sua (account non confermato) la perde
         mostraPassword(() => carica(), false);
@@ -258,15 +274,14 @@ const PF = (() => {
     app().className = '';
     app().innerHTML = `<div class="accesso">
       <img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
-      <h1>Scegli la tua password</h1>
-      <p class="sotto">La prossima volta entri con l'e-mail e questa password, e il telefono può ricordarla per te. Almeno 8 caratteri:
-        meglio una frase facile da ricordare, per esempio tre parole.</p>
+      <h1>${L('Scegli la tua password')}</h1>
+      <p class="sotto">${L('La prossima volta entri con l’e-mail e questa password. Almeno 8 caratteri: meglio tre parole facili da ricordare.')}</p>
       <form id="f-pw" class="campo" novalidate>
         <input type="email" name="email" autocomplete="username" value="${esc(emailAccesso)}" hidden>
-        <label for="nuova">La nuova password</label>
+        <label for="nuova">${L('La nuova password')}</label>
         <div class="campo-pw"><input id="nuova" name="new-password" type="password" autocomplete="new-password" minlength="8" enterkeyhint="done">
-          <button type="button" class="mostra-pw" aria-label="Mostra la password" aria-pressed="false">Mostra</button></div>
-        <button class="btn pieno" style="margin-top:8px">Salva ed entra</button>
+          <button type="button" class="mostra-pw" aria-label="${L('Mostra')}" aria-pressed="false">${L('Mostra')}</button></div>
+        <button class="btn pieno" style="margin-top:8px">${L('Salva ed entra')}</button>
       </form>
       ${msg ? `<p class="errore" role="alert">${esc(msg)}</p>` : ''}
       ${puoSaltare ? '<p class="sotto"><a href="#" id="salta">Tengo la password di prima</a></p>' : ''}
@@ -278,15 +293,15 @@ const PF = (() => {
     document.getElementById('f-pw').addEventListener('submit', ev => {
       ev.preventDefault();
       const pw = n.value;
-      if (pw.length < 8) return mostraPassword(dopo, puoSaltare, 'La password deve avere almeno 8 caratteri.');
-      const b = ev.currentTarget.querySelector('.btn'); b.disabled = true; b.textContent = 'Salvo…';
+      if (pw.length < 8) return mostraPassword(dopo, puoSaltare, L('La password deve avere almeno 8 caratteri.'));
+      const b = ev.currentTarget.querySelector('.btn'); b.disabled = true; b.textContent = L('Salvo…');
       collegamento().auth.updateUser({ password: pw, data: { password_scelta: true } }).then(({ error }) => {
-        if (!error || error.code === 'same_password') { toast('Password salvata.'); return dopo(); }
+        if (!error || error.code === 'same_password') { toast(L('Password salvata.')); return dopo(); }
         if (error.code === 'weak_password' || /weak|pwned|leak/i.test(error.message))
           return mostraPassword(dopo, puoSaltare, 'Questa password è troppo facile, o è già finita in furti di dati su altri siti: scegline un’altra.');
         if (error.code === 'reauthentication_needed' || error.status === 401)
           return mostraAccesso('Per cambiare la password, ricevi un codice per e-mail.');
-        mostraPassword(dopo, puoSaltare, navigator.onLine === false ? 'Sei senza rete: riprova quando torna il segnale.' : 'Non riesco a salvarla: riprova tra poco.');
+        mostraPassword(dopo, puoSaltare, navigator.onLine === false ? L('Sei senza rete: riprova quando torna il segnale.') : 'Non riesco a salvarla: riprova tra poco.');
       });
     });
   }
@@ -294,7 +309,7 @@ const PF = (() => {
     document.querySelectorAll('.mostra-pw').forEach(b => b.addEventListener('click', () => {
       const i = b.previousElementSibling, vedi = i.type === 'password';
       i.type = vedi ? 'text' : 'password';
-      b.textContent = vedi ? 'Nascondi' : 'Mostra';
+      b.textContent = vedi ? L('Nascondi') : L('Mostra');
       b.setAttribute('aria-pressed', String(vedi));
     }));
   }
@@ -366,6 +381,8 @@ const PF = (() => {
         return richiesta();
       }
       A = r;
+      // il titolare vede l'app in italiano; il dipendente nella sua lingua
+      impostaLingua(A.io.ruolo === 'titolare' ? 'it' : (A.io.lingua || leggi('pf-lingua', null) || 'it'), A.io.ruolo !== 'titolare');
       if (A.persone && !A.persone.find(p => p.id === A.io.id)) A.persone.push(A.io);
       svuotaCoda();
       if (dopo) dopo(); else disegna();
@@ -396,7 +413,7 @@ const PF = (() => {
 
   function voci() {
     if (titolare()) return [['home', 'Home'], ['oggi', 'Oggi'], ['turni', 'Turni'], ['ferie', 'Ferie'], ['mese', 'Mese'], ['altro', 'Altro']];
-    return [['timbra', 'Timbra'], ['turni', 'Turni'], ['ferie', 'Ferie'], ['compiti', 'Compiti'], ['profilo', 'Profilo']];
+    return [['timbra', L('Timbra')], ['turni', L('Turni')], ['ferie', L('Ferie')], ['compiti', L('Compiti')], ['profilo', L('Profilo')]];
   }
   function vistaDaHash() {
     const h = location.hash.replace('#', '').split('=')[0];
@@ -419,8 +436,8 @@ const PF = (() => {
     const v = vistaDaHash();
     const da = { home: vHome, oggi: vOggi, turni: vTurni, ferie: vFerie, mese: vMese, altro: vAltro, timbra: vTimbra, compiti: vCompiti, profilo: vProfilo }[v];
     const daDecidere = titolare() ? A.assenze.filter(a => a.stato === 'chiesta').length : 0;
-    const titolo = { home: '', oggi: 'Oggi', turni: 'Turni', ferie: 'Ferie e riposi', mese: 'Cruscotto del mese', altro: 'Impostazioni',
-      timbra: '', compiti: 'Compiti', profilo: 'Profilo' }[v];
+    const titolo = { home: '', oggi: 'Oggi', turni: L('Turni'), ferie: L('Ferie e riposi'), mese: 'Cruscotto del mese', altro: 'Impostazioni',
+      timbra: '', compiti: L('Compiti'), profilo: L('Profilo') }[v];
     app().className = v === 'mese' || (v === 'turni' && titolare() && (A.tipi || []).length) ? 'largo' : '';
     if (!A.attiva) {
       app().innerHTML = barraDemo() + `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
@@ -457,21 +474,37 @@ const PF = (() => {
   function assenzaDel(pid, g) {
     return A.assenze.find(a => a.persona === pid && a.stato === 'approvata' && g >= a.dal && g <= a.al && a.tipo !== 'permesso');
   }
+  /* La home del titolare (3/11/2026): cosa c'è da fare adesso, poi chi è in
+     stalla. Le richieste si decidono in Ferie; qui solo il richiamo. */
   function vHome() {
     const { dip, dentro, assenti } = chiDentro();
+    const oggi = Conti.oggi(), adesso = Conti.roma(new Date().toISOString()).ora;
     const chieste = A.assenze.filter(a => a.stato === 'chiesta').length;
-    return `<div><p class="saluto">${saluto()}, ${esc(A.io.nome)}</p><p class="sotto">${esc(A.azienda.ragione)}</p></div>
+    const oltre = dentro.map(p => ({ p, o: Conti.oltre(A.timbrature, p, A.turni, null) })).filter(x => x.o && x.o.minuti >= Conti.TOLLERANZA);
+    const rit = Number(A.azienda.ritardo_minuti || 15);
+    const mancano = dip.filter(p => !Conti.dentro(A.timbrature, p.id) && !assenzaDel(p.id, oggi)
+      && !Conti.valide(A.timbrature).some(t => t.persona === p.id && Conti.roma(t.quando).giorno === oggi))
+      .map(p => ({ p, u: Conti.turniDelGiorno(A.turni, p.id, oggi).find(u => u.inizio) }))
+      .filter(x => x.u && adesso >= piuMinuti(String(x.u.inizio).slice(0, 5), rit));
+    const cose = [
+      ...oltre.map(x => `<a class="riga cosa" href="#oggi"><span><b>${esc(x.p.nome)}</b> è oltre l’orario</span><span class="chip arancio">${Conti.durataTesto(x.o.minuti)}</span></a>`),
+      ...mancano.map(x => `<a class="riga cosa" href="#oggi"><span><b>${esc(x.p.nome)}</b> non ha timbrato</span><span class="chip rosso">turno dalle ${String(x.u.inizio).slice(0, 5)}</span></a>`),
+      chieste ? `<a class="riga cosa" href="#ferie"><span><b>${chieste === 1 ? 'Una richiesta' : chieste + ' richieste'}</b> di ferie o riposo da decidere</span><span class="chip nero">Apri</span></a>` : ''
+    ].filter(Boolean);
+    return `<div><p class="saluto">${saluto()}, ${esc(A.io.nome)}</p><p class="sotto">${esc(A.azienda.ragione)} · ${dataLunga(oggi)}</p></div>
       <div id="avvisi-box"></div>
-      <a href="#oggi" class="scheda forte app-card" style="text-decoration:none">
-        <span class="ico" style="background:var(--inchiostro);color:var(--arancio)">${svg('oggi')}</span>
-        <span><b>Presenze e turni</b><span class="sotto">Adesso in stalla ${dentro.length} su ${dip.length}${assenti.length ? ` · ${assenti.length} assent${assenti.length > 1 ? 'i' : 'e'}` : ''}.</span>
-        ${chieste ? `<span class="chip nero" style="margin-top:6px">${chieste} da approvare</span>` : ''}</span></a>
-      <div class="scheda"><h2 class="sezione" style="margin:0 0 4px">Adesso in stalla</h2>
-        ${dentro.length ? `<b>${dentro.map(p => esc(p.nome)).join(', ')}</b>` : '<span class="sotto">Nessuno.</span>'}
-        ${assenti.length ? `<span class="sotto"> · fuori ${assenti.map(p => esc(p.nome) + ' (' + TIPI[assenzaDel(p.id, Conti.oggi()).tipo].toLowerCase() + ')').join(', ')}</span>` : ''}</div>
+      <a href="#oggi" class="scheda forte cifra-stalla" style="text-decoration:none">
+        <span class="sotto">Adesso in stalla</span>
+        <b>${dentro.length} <small>su ${dip.length}</small></b>
+        <span>${dentro.length ? dentro.map(p => esc(p.nome)).join(', ') : 'Nessuno'}</span></a>
+      <h2 class="sezione">Da fare adesso</h2>
+      <div class="scheda">${cose.length ? cose.join('') : '<p class="lista-vuota">Niente: tutto in ordine.</p>'}</div>
+      ${assenti.length ? `<h2 class="sezione">Fuori oggi</h2><div class="scheda">${assenti.map(p =>
+        `<div class="riga"><span>${esc(nome(p))}</span><span class="dx">${TIPI[assenzaDel(p.id, oggi).tipo]}</span></div>`).join('')}</div>` : ''}
       <p class="sotto">Easy è gratuita per i clienti piùLact. Per la tua stalla c’è anche
         <a href="https://riposa.profarmer.it/" target="_blank" rel="noopener">Riposa</a>, il calcolo di piùLact e il promemoria del riordino.</p>`;
   }
+  const piuMinuti = (hm, n) => { const [h, m] = hm.split(':').map(Number); const t = Math.min(1439, h * 60 + m + n); return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; };
 
   /* ------------------------------------------------------- oggi (titolare) */
   function statoPersona(p) {
@@ -541,30 +574,28 @@ const PF = (() => {
     const dentro = Conti.dentro(A.timbrature, A.io.id);
     const turni = Conti.turniDelGiorno(A.turni, A.io.id, oggi);
     const u = ultimaMia();
-    const coda = leggi(K_CODA, []).filter(c => c.tipo === 'qr' || c.tipo === 'io');
+    const coda = leggi(K_CODA, []).filter(c => c.tipo === 'io');
     const verifica = A.azienda.verifica;
     const f = Conti.foglio(A.io, A.timbrature, A.assenze, A.azienda, oggi.slice(0, 7));
     const a = assenzaDel(A.io.id, oggi);
-    return `<p class="saluto">Ciao ${esc(A.io.nome)}</p>
-      <p class="orologio" id="orologio">${Conti.roma(new Date().toISOString()).ora}</p>
-      <p class="data">${dataLunga(oggi)}</p>
-      ${dentro ? contatore(dentro.quando) : ''}
-      ${a ? `<div class="avviso">Oggi sei in ${TIPI[a.tipo].toLowerCase()}.</div>` : ''}
-      <button class="btn enorme" data-az="timbra-io" data-verso="${dentro ? 'uscita' : 'entrata'}">${verifica === 'qr' ? svg('timbra') + ' ' : ''}${dentro ? 'Uscita · fine lavoro' : 'Entrata · inizio lavoro'}</button>
-      <p class="sotto" style="text-align:center">${verifica === 'posizione' ? 'Quando premi, il telefono dice solo se sei in azienda. Nessun tracciamento.'
-        : verifica === 'qr' ? 'Dopo il tocco inquadra il QR appeso in azienda.' : ''}</p>
+    return `<p class="saluto">${L('Ciao {nome}', { nome: esc(A.io.nome) })}</p>
+      ${dentro ? `<p class="data">${dataLunga(oggi)} · <span id="orologio">${Conti.roma(new Date().toISOString()).ora}</span></p>${contatore(dentro.quando)}`
+        : `<p class="orologio" id="orologio">${Conti.roma(new Date().toISOString()).ora}</p><p class="data">${dataLunga(oggi)}</p>`}
+      ${a ? `<div class="avviso">${L('Oggi: {tipo}.', { tipo: tipoT(a.tipo) })}</div>` : ''}
+      <button class="btn enorme${dentro ? ' uscita' : ''}" data-az="timbra-io" data-verso="${dentro ? 'uscita' : 'entrata'}">${dentro ? L('Uscita · fine lavoro') : L('Entrata · inizio lavoro')}</button>
+      <p class="sotto" style="text-align:center">${verifica !== 'nessuna' ? L('Quando premi, il telefono dice solo se sei in azienda. Nessun tracciamento.')
+        : ''}</p>
       <div id="avvisi-box"></div>
-      ${coda.length ? `<div class="avviso">${coda.length === 1 ? 'Una timbratura è salvata' : coda.length + ' timbrature sono salvate'} sul telefono:
-        partono da sole quando torna la rete.</div>` : ''}
-      <div class="scheda"><h2 class="sezione" style="margin:0 0 2px">Il tuo turno di oggi</h2>
-        ${turni.length ? turni.map(t => `<div class="riga"><span>${esc(t.mansione)}${t.nota ? ` <small class="sotto">${esc(t.nota)}</small>` : ''}</span><span class="dx">${t.inizio}–${t.fine}</span></div>`).join('')
-          : '<p class="lista-vuota">Oggi non hai turni.</p>'}</div>
-      ${(A.lavori || []).some(l => l.giorno === oggi) ? `<div class="scheda"><h2 class="sezione" style="margin:0 0 2px">I lavori di oggi</h2>
+      ${coda.length ? `<div class="avviso">${L('Timbrature salvate sul telefono: {n}. Partono da sole quando torna la rete.', { n: coda.length })}</div>` : ''}
+      <div class="scheda"><h2 class="sezione" style="margin:0 0 2px">${L('Il tuo turno di oggi')}</h2>
+        ${turni.length ? turni.map(t => `<div class="riga"><span>${esc(t.mansione)}${t.nota ? ` <small class="sotto">${esc(t.nota)}</small>` : ''}</span><span class="dx">${bdi(`${t.inizio}–${t.fine}`)}</span></div>`).join('')
+          : `<p class="lista-vuota">${L('Oggi non hai turni.')}</p>`}</div>
+      ${(A.lavori || []).some(l => l.giorno === oggi) ? `<div class="scheda"><h2 class="sezione" style="margin:0 0 2px">${L('I lavori di oggi')}</h2>
         ${(A.lavori || []).filter(l => l.giorno === oggi).map(l => `<p class="lavoro">${esc(l.testo)}</p>`).join('')}</div>` : ''}
-      <div class="scheda"><div class="riga"><span>Ultima timbratura</span><span class="dx">${u
-        ? `${Conti.roma(u.quando).giorno === oggi ? 'oggi' : dataIt(Conti.roma(u.quando).giorno)}, ${u.verso} ${ora(u.quando)}` : '—'}</span></div>
-        <div class="riga"><span>Le tue ore di ${MESI[Number(oggi.slice(5, 7)) - 1]}</span><span class="dx">${Conti.hhmm(f.totale.lavoro)}</span></div></div>
-      <p class="sotto">Se hai sbagliato una timbratura, dillo al titolare: la corregge lui.</p>`;
+      <div class="scheda"><div class="riga"><span>${L('Ultima timbratura')}</span><span class="dx">${u
+        ? `${Conti.roma(u.quando).giorno === oggi ? L('oggi') : dataIt(Conti.roma(u.quando).giorno)}, ${L(u.verso)} ${bdi(ora(u.quando))}` : '—'}</span></div>
+        <div class="riga"><span>${L('Le tue ore del mese')}</span><span class="dx">${Conti.hhmm(f.totale.lavoro)}</span></div></div>
+      <p class="sotto">${L('Se hai sbagliato una timbratura, dillo al titolare: la corregge lui.')}</p>`;
   }
   /* Il contatore dopo l'entrata (dal 31/10/2026): da quanto si lavora, quando
      finisce il turno e, dopo, di quanto lo si è passato. */
@@ -579,11 +610,11 @@ const PF = (() => {
     const sec = Math.max(0, Math.floor((Date.now() - new Date(dal)) / 1000));
     const due = n => String(n).padStart(2, '0');
     return `<div class="contatore${oltre ? ' oltre' : ''}" id="contatore" data-dal="${dal}" role="timer" aria-live="off">
-      <span class="etichetta">Al lavoro da</span>
+      <span class="etichetta">${L('Al lavoro da')}</span>
       <b class="tempo" aria-label="${Conti.durataTesto(o.presenza)}">${Math.floor(sec / 3600)}:${due(Math.floor(sec / 60) % 60)}:${due(sec % 60)}</b>
-      <span class="unita">ore : minuti : secondi</span>
-      <span class="fine${oltre ? ' oltre' : ''}">${oltre ? `Oltre l’orario di ${Conti.durataTesto(o.minuti)}<br><span style="font-weight:500;color:var(--testo-2)">Turno finito alle ${ora(fine)}</span>`
-        : `Fine turno alle ${ora(fine)} · turno di ${Conti.durataTesto(o.durata).replace(' 00 min', '')}`}</span></div>`;
+      <span class="unita">${L('ore : minuti : secondi')}</span>
+      <span class="fine${oltre ? ' oltre' : ''}">${oltre ? `${L('Oltre l’orario di {durata}', { durata: bdi(Conti.durataTesto(o.minuti)) })}<br><span style="font-weight:500;color:var(--testo-2)">${L('Turno finito alle {ora}', { ora: bdi(ora(fine)) })}</span>`
+        : L('Fine turno alle {ora} · turno di {durata}', { ora: bdi(ora(fine)), durata: bdi(Conti.durataTesto(o.durata).replace(' 00 min', '')) })}</span></div>`;
   }
   function avviaOrologio() {
     const passo = () => {
@@ -597,85 +628,11 @@ const PF = (() => {
   }
   function fermaOrologio() { if (orologio) clearInterval(orologio); orologio = null; }
 
-  /* Il lettore del QR: BarcodeDetector se c'è, altrimenti jsQR. */
-  function inquadra(dopo) {
-    let flusso = null, fermo = false;
-    const el = document.createElement('div');
-    el.className = 'lettore';
-    el.innerHTML = `<video playsinline muted autoplay></video><div class="mirino" aria-hidden="true"></div>
-      <div class="giu"><p class="sotto" id="lettore-msg">Inquadra il QR appeso in stalla.</p>
-      <button class="btn sec pieno" id="lettore-chiudi">Annulla</button></div>`;
-    document.body.appendChild(el);
-    const chiudi = () => { fermo = true; if (flusso) flusso.getTracks().forEach(t => t.stop()); el.remove(); };
-    el.querySelector('#lettore-chiudi').addEventListener('click', chiudi);
-    const video = el.querySelector('video');
-    const msg = t => { const m = el.querySelector('#lettore-msg'); if (m) m.textContent = t; };
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      msg('Questo telefono non lascia usare la fotocamera all’app. Inquadra il QR con la fotocamera del telefono: si apre l’app e timbra.');
-      return;
-    }
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }).then(s => {
-      flusso = s; video.srcObject = s;
-      const usaDetector = 'BarcodeDetector' in window;
-      const det = usaDetector ? new window.BarcodeDetector({ formats: ['qr_code'] }) : null;
-      const tela = document.createElement('canvas'); const ctx = tela.getContext('2d', { willReadFrequently: true });
-      const prova = () => usaDetector ? Promise.resolve() : caricaLib(LIB.jsqr, 'jsQR');
-      prova().then(() => {
-        const giro = () => {
-          if (fermo) return;
-          if (video.readyState < 2) return requestAnimationFrame(giro);
-          const leggiTesto = det
-            ? det.detect(video).then(r => r[0] && r[0].rawValue)
-            : Promise.resolve((() => {
-              tela.width = video.videoWidth; tela.height = video.videoHeight;
-              ctx.drawImage(video, 0, 0);
-              const r = window.jsQR(ctx.getImageData(0, 0, tela.width, tela.height).data, tela.width, tela.height, { inversionAttempts: 'dontInvert' });
-              return r && r.data;
-            })());
-          leggiTesto.then(t => {
-            const c = codiceDa(t);
-            if (c) { chiudi(); (typeof dopo === 'function' ? dopo : timbraQR)(c); } else setTimeout(giro, 180);
-          }).catch(() => setTimeout(giro, 300));
-        };
-        giro();
-      }).catch(e => msg(e.message));
-    }).catch(() => msg('Serve il permesso della fotocamera: dagli l’ok nelle impostazioni del telefono, o inquadra il QR con la fotocamera.'));
-  }
-  // il QR contiene https://easy.profarmer.it/#t=<codice>
-  function codiceDa(t) {
-    if (!t) return null;
-    const m = String(t).match(/[#&?]t=([0-9a-z-]{8,40})/i);
-    return m ? m[1] : null;
-  }
-
-  function posizione() {
-    if (A.azienda.verifica !== 'posizione' || !navigator.geolocation) return Promise.resolve(null);
-    // solo adesso, una volta: niente posizione in continuo
-    return new Promise(ok => navigator.geolocation.getCurrentPosition(
-      p => ok({ lat: p.coords.latitude, lon: p.coords.longitude }), () => ok(null),
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }));
-  }
-  function timbraQR(codice) {
-    const quando = new Date().toISOString(), chiave = nuovaChiave();
-    posizione().then(pos => {
-      const args = { p_codice: codice, p_verso: null, p_ora_telefono: quando, p_chiave: chiave,
-        p_lat: pos ? pos.lat : null, p_lon: pos ? pos.lon : null };
-      rpc('pf_timbra', args).then(r => {
-        esito(true, r.verso === 'entrata' ? 'Entrata' : 'Uscita', `${r.gia ? 'Era già segnata alle' : 'Alle'} ${ora(r.quando)}. Buon lavoro, ${A.io.nome}.`);
-        aggiorna();
-      }).catch(e => {
-        if (e.delDatabase) return esito(false, 'Non timbrata', e.message);
-        metti({ tipo: 'qr', args });
-        esito(true, 'Salvata sul telefono', `Sei senza rete: la timbratura delle ${ora(quando)} parte appena torna il segnale.`);
-        disegna();
-      });
-    });
-  }
   function esito(ok, titolo, testo, dopo) {
     const el = document.createElement('div');
     el.className = 'esito ' + (ok ? 'ok' : 'no'); el.setAttribute('role', 'alert');
     el.innerHTML = `<div class="segno">${ok ? '✓' : '!'}</div><h2>${esc(titolo)}</h2><p>${esc(testo)}</p>
-      <button class="btn sec" style="margin-top:12px">Chiudi</button>`;
+      <button class="btn sec" style="margin-top:12px">${L('Chiudi')}</button>`;
     document.body.appendChild(el);
     if (navigator.vibrate) navigator.vibrate(ok ? 80 : [60, 60, 60]);
     const via = () => { el.remove(); if (dopo) dopo(); };
@@ -691,7 +648,7 @@ const PF = (() => {
     if (!q.length || svuoto || navigator.onLine === false) return Promise.resolve();
     svuoto = true;
     const resto = [];
-    return q.reduce((p, c) => p.then(() => rpc({ qr: 'pf_timbra', chiosco: 'pf_chiosco_timbra', io: 'pf_timbra_io' }[c.tipo], c.args)
+    return q.reduce((p, c) => p.then(() => rpc('pf_timbra_io', c.args)
       .catch(e => { if (!e.delDatabase) resto.push(c); })), Promise.resolve())
       .then(() => { scrivi(K_CODA, (resto.length ? resto : null)); svuoto = false; if (resto.length < q.length && A) aggiorna(`Partite le timbrature salvate (${q.length - resto.length}).`); });
   }
@@ -751,6 +708,17 @@ const PF = (() => {
         <ul>${avvisi.map(a => `<li>${esc(a.testo)}</li>`).join('')}</ul>
         <p class="sotto">Le regole sul riposo dipendono dal contratto: in caso di dubbio chiedi al consulente del lavoro.</p></details>`
         : (vuota ? '' : '<p class="sotto">Nessun problema trovato: ognuno ha un riposo, niente turni sovrapposti, almeno 11 ore di riposo di fila.</p>')}
+      ${(() => {   // sul telefono un giorno alla volta (3/11/2026); dal tablet in su la griglia
+        const g = g7.includes(giornoVisto) ? giornoVisto : (g7.includes(oggi) ? oggi : g7[0]);
+        const riga = (az, attr, titolo, sotto, chi) => `<button class="riga-giorno" data-az="${az}" ${attr}><span><b>${titolo}</b><small>${sotto}</small></span>
+          <span class="chi">${chi || '<span class="vuota">+ metti</span>'}</span></button>`;
+        return `<div class="vista-giorno"><div class="giorni-scelta" role="tablist">${g7.map(x => `<button role="tab" data-az="giorno-visto" data-giorno="${x}"
+            aria-selected="${x === g}" class="${x === oggi ? 'oggi' : ''}"><small>${GIORNI[Conti.giornoSettimana(x)].slice(0, 3)}</small>${Number(x.slice(8))}</button>`).join('')}</div>
+          ${aree.map(ar => `${ar ? `<h2 class="sezione">${esc(ar)}</h2>` : ''}<div class="scheda">${A.tipi.filter(y => (y.area || '') === ar).map(y =>
+            riga('cella', `data-tipo="${y.id}" data-giorno="${g}"`, esc(y.nome), orarioTipo(y), inCella(y.id, g).map(x => `${nomeCorto(x.id)}${x.nota ? ` <small>${esc(x.nota)}</small>` : ''}`).join(', '))).join('')}</div>`).join('')}
+          <div class="scheda">${riga('cella', `data-tipo="" data-giorno="${g}"`, 'Festa', 'riposo', A.persone.filter(p => riposoDel(p.id, g)).map(p => esc(p.nome)).join(', '))}
+            ${riga('lavori', `data-giorno="${g}"`, 'Lavori', 'del giorno', lavori(g).map(l => esc(l.testo)).join(' · '))}</div></div>`;
+      })()}
       <div class="griglia"><table>
         <thead><tr><th></th>${g7.map(g => `<th class="${g === oggi ? 'oggi' : ''}">${GIORNI[Conti.giornoSettimana(g)].slice(0, 3)} ${g.slice(8)}</th>`).join('')}</tr></thead>
         <tbody>${aree.map(ar => `${ar ? `<tr class="area"><th colspan="8">${esc(ar)}</th></tr>` : ''}
@@ -848,13 +816,13 @@ const PF = (() => {
       <div class="scheda">${g7.map(g => {
         const righe = persone.flatMap(p => Conti.turniDelGiorno(A.turni, p.id, g).map(u => ({ p, u })));
         const ass = persone.map(p => ({ p, a: assenzaDel(p.id, g) })).filter(x => x.a);
-        return `<div class="giorno-turni"><h3 class="${g === oggi ? 'oggi' : ''}"><span>${GIORNI[Conti.giornoSettimana(g)]} ${dataIt(g)}</span>
+        return `<div class="giorno-turni"><h3 class="${g === oggi ? 'oggi' : ''}"><span>${nomeGiorno(g)} ${dataIt(g)}</span>
           ${titolare() ? `<button class="link" data-az="turno-nuovo" data-giorno="${g}">+ aggiungi</button>` : ''}</h3>
           ${righe.map(({ p, u }) => `<button class="turno" ${titolare() ? `data-az="turno" data-id="${u.id}" data-giorno="${g}"` : (u.compito ? `data-az="compito" data-id="${u.compito}"` : 'disabled')}>
-            <span>${titolare() ? `<b>${esc(p.nome)}</b> · ` : ''}${esc(u.mansione)}${u.nota ? ` <small>${esc(u.nota)}</small>` : ''}</span><span>${u.inizio}–${u.fine}</span></button>`).join('')}
+            <span>${titolare() ? `<b>${esc(p.nome)}</b> · ` : ''}${esc(u.mansione)}${u.nota ? ` <small>${esc(u.nota)}</small>` : ''}</span><span>${bdi(`${u.inizio}–${u.fine}`)}</span></button>`).join('')}
 
-          ${ass.map(({ p, a }) => `<div class="turno" style="background:transparent;box-shadow:inset 0 0 0 1px var(--bordo)"><span>${titolare() ? `<b>${esc(p.nome)}</b> · ` : ''}${TIPI[a.tipo]}</span><span></span></div>`).join('')}
-          ${!righe.length && !ass.length ? '<p class="lista-vuota">Nessun turno.</p>' : ''}
+          ${ass.map(({ p, a }) => `<div class="turno" style="background:transparent;box-shadow:inset 0 0 0 1px var(--bordo)"><span>${titolare() ? `<b>${esc(p.nome)}</b> · ` : ''}${tipoT(a.tipo)}</span><span></span></div>`).join('')}
+          ${!righe.length && !ass.length ? `<p class="lista-vuota">${L('Nessun turno.')}</p>` : ''}
           ${!titolare() ? (A.lavori || []).filter(l => l.giorno === g).map(l => `<p class="lavoro">${esc(l.testo)}</p>`).join('') : ''}</div>`;
       }).join('')}</div>`;
   }
@@ -896,14 +864,14 @@ const PF = (() => {
   /* ---------------------------------------------------------------- ferie */
   function rigaAssenza(a, decidi) {
     const p = persona(a.persona);
-    const quando = a.dal === a.al ? `il ${dataIt(a.dal)}` : `dal ${dataIt(a.dal)} al ${dataIt(a.al)}`;
-    const stato = { chiesta: '<span class="chip giallo">Da decidere</span>', approvata: '<span class="chip verde">Approvata</span>',
-      rifiutata: '<span class="chip rosso">Non approvata</span>' }[a.stato] || '';
+    const quando = a.dal === a.al ? L('il {g}', { g: dataIt(a.dal) }) : L('dal {a} al {b}', { a: dataIt(a.dal), b: dataIt(a.al) });
+    const stato = { chiesta: `<span class="chip giallo">${L('Da decidere')}</span>`, approvata: `<span class="chip verde">${L('Approvata')}</span>`,
+      rifiutata: `<span class="chip rosso">${L('Non approvata')}</span>` }[a.stato] || '';
     return `<div class="riga" style="flex-wrap:wrap"><span style="flex:1;min-width:180px">${titolare() || a.persona !== A.io.id ? `<b>${esc(p ? p.nome : '')}</b> · ` : ''}
-      ${TIPI[a.tipo]}${a.ore ? ` (${a.ore} ore)` : ''} ${quando}${a.nota ? `<br><span class="sotto">${esc(a.nota)}</span>` : ''}</span>
+      ${tipoT(a.tipo)}${a.ore ? ` (${L('{n} ore', { n: a.ore })})` : ''} ${quando}${a.nota ? `<br><span class="sotto">${esc(a.nota)}</span>` : ''}</span>
       <span class="dx"${decidi ? ' style="flex:1 1 100%"' : ''}>${decidi ? `<span class="riga-bottoni"><button class="btn piccolo" data-az="decidi" data-id="${a.id}" data-esito="approvata">Approva</button>
         <button class="btn piccolo sec" data-az="decidi" data-id="${a.id}" data-esito="rifiutata">Rifiuta</button></span>`
-        : stato + (a.persona === A.io.id && a.stato === 'chiesta' ? ` <button class="link" data-az="ritira" data-id="${a.id}">Ritira</button>` : '')
+        : stato + (a.persona === A.io.id && a.stato === 'chiesta' ? ` <button class="link" data-az="ritira" data-id="${a.id}">${L('Ritira')}</button>` : '')
           + (titolare() && a.stato === 'approvata' ? ` <button class="link" data-az="decidi" data-id="${a.id}" data-esito="annullata">Togli</button>` : '')}</span></div>`;
   }
   function vFerie() {
@@ -917,37 +885,37 @@ const PF = (() => {
       <div class="scheda">${prossime.length ? prossime.map(a => rigaAssenza(a)).join('') : '<p class="lista-vuota">Nessuno.</p>'}</div>`;
     const mie = A.assenze.filter(a => a.persona === A.io.id).sort((a, b) => b.dal.localeCompare(a.dal));
     const altri = prossime.filter(a => a.persona !== A.io.id);
-    return `<button class="btn" data-az="assenza-nuova">+ Chiedi ferie, riposo o permesso</button>
-      <h2 class="sezione">Le tue richieste</h2>
-      <div class="scheda">${mie.length ? mie.map(a => rigaAssenza(a)).join('') : '<p class="lista-vuota">Nessuna.</p>'}</div>
-      <h2 class="sezione">Chi manca nei prossimi giorni</h2>
-      <div class="scheda">${altri.length ? altri.map(a => rigaAssenza(a)).join('') : '<p class="lista-vuota">Nessuno.</p>'}</div>
-      <p class="sotto">Se stai male, avvisa il titolare: la malattia la segna lui.</p>`;
+    return `<button class="btn" data-az="assenza-nuova">${L('+ Chiedi ferie, riposo o permesso')}</button>
+      <h2 class="sezione">${L('Le tue richieste')}</h2>
+      <div class="scheda">${mie.length ? mie.map(a => rigaAssenza(a)).join('') : `<p class="lista-vuota">${L('Nessuna.')}</p>`}</div>
+      <h2 class="sezione">${L('Chi manca nei prossimi giorni')}</h2>
+      <div class="scheda">${altri.length ? altri.map(a => rigaAssenza(a)).join('') : `<p class="lista-vuota">${L('Nessuno.')}</p>`}</div>
+      <p class="sotto">${L('Se stai male, avvisa il titolare: la malattia la segna lui.')}</p>`;
   }
   function foglioAssenza() {
     const tit = titolare();
     const tipi = tit ? ['ferie', 'riposo', 'permesso', 'malattia'] : ['ferie', 'riposo', 'permesso'];
-    foglio(tit ? 'Segna un’assenza' : 'Chiedi ferie o riposo', `
+    foglio(tit ? 'Segna un’assenza' : L('Chiedi ferie o riposo'), `
       ${tit ? `<div class="campo"><label for="a-persona">Chi</label><select id="a-persona">${A.persone.filter(p => p.attivo !== false).map(p =>
         `<option value="${p.id}">${esc(nome(p))}</option>`).join('')}</select></div>` : ''}
-      <div class="campo"><label for="a-tipo">Cosa</label><select id="a-tipo">${tipi.map(t => `<option value="${t}">${TIPI[t]}</option>`).join('')}</select></div>
-      <div class="due"><div class="campo"><label for="a-dal">Dal</label><input id="a-dal" type="date" value="${Conti.oggi()}"></div>
-        <div class="campo"><label for="a-al">Al</label><input id="a-al" type="date" value="${Conti.oggi()}"></div></div>
-      <div class="campo nascosto" id="a-ore-c"><label for="a-ore">Quante ore</label><input id="a-ore" type="number" inputmode="decimal" min="0.5" max="12" step="0.5" value="2"></div>
-      <div class="campo"><label for="a-nota">Una nota (facoltativa)</label><input id="a-nota" maxlength="300"></div>
+      <div class="campo"><label for="a-tipo">${L('Cosa')}</label><select id="a-tipo">${tipi.map(t => `<option value="${t}">${tipoT(t)}</option>`).join('')}</select></div>
+      <div class="due"><div class="campo"><label for="a-dal">${L('Dal')}</label><input id="a-dal" type="date" value="${Conti.oggi()}"></div>
+        <div class="campo"><label for="a-al">${L('Al')}</label><input id="a-al" type="date" value="${Conti.oggi()}"></div></div>
+      <div class="campo nascosto" id="a-ore-c"><label for="a-ore">${L('Quante ore')}</label><input id="a-ore" type="number" inputmode="decimal" min="0.5" max="12" step="0.5" value="2"></div>
+      <div class="campo"><label for="a-nota">${L('Una nota (facoltativa)')}</label><input id="a-nota" maxlength="300"></div>
       <p class="errore" id="a-err"></p>
-      <button class="btn pieno" id="a-salva">${tit ? 'Salva' : 'Manda la richiesta'}</button>
-      ${tit ? '' : '<p class="sotto">Il titolare la approva o la rifiuta, e ti arriva la notifica.</p>'}`, f => {
+      <button class="btn pieno" id="a-salva">${tit ? 'Salva' : L('Manda la richiesta')}</button>
+      ${tit ? '' : `<p class="sotto">${L('Il titolare la approva o la rifiuta, e ti arriva la notifica.')}</p>`}`, f => {
       const tipo = f.querySelector('#a-tipo');
       tipo.addEventListener('change', () => f.querySelector('#a-ore-c').classList.toggle('nascosto', tipo.value !== 'permesso'));
       const dal = f.querySelector('#a-dal'), al = f.querySelector('#a-al');
       dal.addEventListener('change', () => { if (al.value < dal.value) al.value = dal.value; });
       f.querySelector('#a-salva').addEventListener('click', () => {
-        if (al.value < dal.value) return (f.querySelector('#a-err').textContent = 'Il giorno di fine viene prima dell’inizio.');
+        if (al.value < dal.value) return (f.querySelector('#a-err').textContent = L('Il giorno di fine viene prima dell’inizio.'));
         const p = { tipo: tipo.value, dal: dal.value, al: al.value, nota: f.querySelector('#a-nota').value,
           ore: tipo.value === 'permesso' ? f.querySelector('#a-ore').value : '' };
         if (tit) p.persona = f.querySelector('#a-persona').value;
-        salvaE('pf_chiedi_assenza', { p }, tit ? 'Segnata.' : 'Richiesta mandata al titolare.', f);
+        salvaE('pf_chiedi_assenza', { p }, tit ? 'Segnata.' : L('Richiesta mandata al titolare.'), f);
       });
     });
   }
@@ -1037,7 +1005,7 @@ const PF = (() => {
     const chieste = A.assenze.filter(x => x.stato === 'chiesta');
     return `<div class="navsett"><button data-az="mese" data-n="-1" aria-label="Mese prima">‹</button>
         <b>${MESI[m - 1]} ${a}</b><button data-az="mese" data-n="1" aria-label="Mese dopo"${mese >= Conti.oggi().slice(0, 7) ? ' disabled style="opacity:.4"' : ''}>›</button></div>
-      ${chieste.length ? `<div class="scheda">${chieste.map(x => rigaAssenza(x, true)).join('')}</div>` : ''}
+      ${chieste.length ? `<a class="avviso" href="#ferie" style="display:block;text-decoration:none;color:inherit">${chieste.length === 1 ? 'Una richiesta' : chieste.length + ' richieste'} di ferie o riposo da decidere: aprile in <b>Ferie</b>.</a>` : ''}
       <div id="mese-dati"><p class="lista-vuota">Conto le ore…</p></div>`;
   }
   function dettaglio(f) {
@@ -1104,7 +1072,7 @@ const PF = (() => {
       <div class="scheda"><div class="riga"><span>Pausa</span><span class="dx">${A.azienda.pausa_minuti ? `${A.azienda.pausa_minuti} min oltre ${A.azienda.pausa_dopo_ore} ore` : 'nessuna'}</span></div>
         <div class="riga"><span>Promemoria a chi non timbra</span><span class="dx">${A.azienda.ritardo_minuti} min dopo l’inizio del turno</span></div>
         <div class="riga"><span>Avviso straordinari</span><span class="dx">oltre ${A.azienda.soglia_straordinari_mese} ore al mese</span></div>
-        <div class="riga"><span>Controllo quando si timbra dal telefono</span><span class="dx">${{ posizione: 'posizione al momento', qr: 'QR in azienda', nessuna: 'nessuno' }[A.azienda.verifica] || 'posizione al momento'}${A.azienda.verifica === 'posizione' ? (A.azienda.area ? `, ${A.azienda.raggio_m} m` : ' · <b style="color:var(--rosso)">area da segnare</b>') : ''}</span></div>
+        <div class="riga"><span>Controllo quando si timbra dal telefono</span><span class="dx">${{ posizione: 'posizione al momento', nessuna: 'nessuno' }[A.azienda.verifica] || 'posizione al momento'}${A.azienda.verifica === 'posizione' ? (A.azienda.area ? `, ${A.azienda.raggio_m} m` : ' · <b style="color:var(--rosso)">area da segnare</b>') : ''}</span></div>
         <button class="btn sec pieno" style="margin-top:10px" data-az="regole">Cambia le regole</button></div>
       <h2 class="sezione">Documenti</h2>
       <div class="scheda">
@@ -1124,6 +1092,10 @@ const PF = (() => {
         <div class="campo"><label for="p-cognome">Cognome</label><input id="p-cognome" value="${esc(p ? p.cognome : '')}" autocomplete="off"></div></div>
       <div class="campo"><label for="p-email">E-mail (per timbrare dal suo telefono)</label>
         <input id="p-email" type="email" inputmode="email" autocapitalize="off" value="${esc(p ? p.email || '' : '')}"></div>
+      ${tit ? '' : `<div class="due"><div class="campo"><label for="p-naz">Nazionalità</label><select id="p-naz"><option value="">—</option>${Lingue.NAZIONI.map(([n]) =>
+        `<option${p && p.nazionalita === n ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
+        <div class="campo"><label for="p-lingua">Lingua dell’app</label><select id="p-lingua">${Lingue.ELENCO.map(l =>
+          `<option value="${l.id}"${(p && p.lingua || 'it') === l.id ? ' selected' : ''}>${esc(l.nome)}</option>`).join('')}</select></div></div>`}
       <div class="campo"><label for="p-ore">Orario di contratto, ore al giorno</label><input id="p-ore" type="number" inputmode="decimal" min="0" max="16" step="0.5" value="${p ? p.ore_giorno : 9}"></div>
       ${p ? `<div class="campo"><label for="p-paga">Paga oraria netta, € all’ora (la vedi solo tu, nel cruscotto)</label>
         <input id="p-paga" type="text" inputmode="decimal" autocomplete="off" value="${paghe && paghe[p.id] != null ? String(paghe[p.id]).replace('.', ',') : ''}" placeholder="8,00"></div>` : ''}
@@ -1133,6 +1105,8 @@ const PF = (() => {
       ${p ? `${p.email && p.id !== A.io.id ? `<div class="riga-bottoni"><button class="btn sec" id="p-invita">${p.invitato ? 'Rimanda l’accesso' : 'Manda l’accesso'}</button></div>` : ''}
         ${p.email && p.id !== A.io.id ? `<p class="sotto">${p.invitato ? 'Accesso mandato: entra con la sua e-mail e sceglie la sua password, poi timbra dal suo telefono.'
           : 'Manda l’accesso: gli arriva un’e-mail, entra con la sua e-mail, sceglie la password e timbra dal suo telefono.'}</p>` : ''}` : ''}`, f => {
+      const naz = f.querySelector('#p-naz'), lin = f.querySelector('#p-lingua');
+      if (naz) naz.addEventListener('change', () => { const l = Lingue.daNazione(naz.value); if (l) lin.value = l; });
       const campoPaga = f.querySelector('#p-paga');
       if (campoPaga && !paghe) caricaPaghe().then(pp => { if (pp[p.id] != null && !campoPaga.value) campoPaga.value = String(pp[p.id]).replace('.', ','); });
       f.querySelector('#p-salva').addEventListener('click', async () => {
@@ -1141,7 +1115,8 @@ const PF = (() => {
           try { await salvaPaga(p.id, campoPaga.value); } catch (e) { f.querySelector('#p-err').textContent = motivo(e); return; }
         }
         salvaE('pf_salva_persona', { p: { id: p ? p.id : '', nome: f.querySelector('#p-nome').value, cognome: f.querySelector('#p-cognome').value,
-          email: f.querySelector('#p-email').value, ore_giorno: f.querySelector('#p-ore').value, attivo: att ? att.checked : undefined } },
+          email: f.querySelector('#p-email').value, ore_giorno: f.querySelector('#p-ore').value, attivo: att ? att.checked : undefined,
+          ...(naz ? { nazionalita: naz.value, lingua: lin.value } : {}) } },
           p ? 'Salvato.' : 'Aggiunto. Ora mettigli l’e-mail e mandagli l’accesso.', f);
       });
       const inv = f.querySelector('#p-invita'); if (inv) inv.addEventListener('click', () => invita(p, inv));
@@ -1154,41 +1129,6 @@ const PF = (() => {
       if (error || !data || !data.ok) { b.disabled = false; b.textContent = 'Riprova'; return toast((data && data.motivo) || 'E-mail non partita: riprova.'); }
       chiudiFoglio(); aggiorna(`Accesso mandato a ${p.email}.`);
     });
-  }
-  function foglioPunto(q) {
-    foglio(q ? q.nome : 'Nuovo QR', `
-      <div class="campo"><label for="q-nome">Dove sta</label><input id="q-nome" value="${esc(q ? q.nome : 'Sala mungitura')}"></div>
-
-      <p class="errore" id="q-err"></p>
-      <button class="btn pieno" id="q-salva">Salva</button>
-      ${q ? `<button class="btn chiaro" id="q-nuovo">Nuovo QR (il foglio vecchio non vale più)</button>
-        <button class="btn chiaro" id="q-spegni">${q.attivo ? 'Spegni questo QR' : 'Riaccendi questo QR'}</button>` : ''}`, f => {
-      let lat = q ? q.lat : null, lon = q ? q.lon : null;
-      const qui = f.querySelector('#q-qui');
-      if (qui) qui.addEventListener('click', () => {
-        qui.textContent = 'Cerco la posizione…';
-        navigator.geolocation.getCurrentPosition(p => { lat = p.coords.latitude; lon = p.coords.longitude; qui.textContent = 'Posizione segnata ✓'; },
-          () => { qui.textContent = 'Posizione non trovata: riprova all’aperto'; }, { enableHighAccuracy: true, timeout: 15000 });
-      });
-      const dati = extra => ({ p: { id: q ? q.id : '', nome: f.querySelector('#q-nome').value, lat: lat ?? '', lon: lon ?? '',
-        raggio_m: f.querySelector('#q-raggio') ? f.querySelector('#q-raggio').value : '', ...extra } });
-      f.querySelector('#q-salva').addEventListener('click', () => salvaE('pf_salva_punto', dati(), 'Salvato. Ora stampalo e appendilo.', f));
-      const nuovo = f.querySelector('#q-nuovo'); if (nuovo) nuovo.addEventListener('click', () => salvaE('pf_salva_punto', dati({ nuovo_codice: true }), 'QR nuovo: ristampalo.', f));
-      const sp = f.querySelector('#q-spegni'); if (sp) sp.addEventListener('click', () => salvaE('pf_salva_punto', dati({ attivo: !q.attivo }), 'Fatto.', f));
-    });
-  }
-  function stampaQR(q) {
-    caricaLib(LIB.qr, 'qrcode').then(qrcode => {
-      const c = qrcode(0, 'M'); c.addData(`${INDIRIZZO}#t=${q.codice}`); c.make();
-      document.getElementById('stampa').innerHTML = `<div style="font-family:Inter,Arial,sans-serif;color:#000;text-align:center;padding:16mm 10mm">
-        <p style="font-size:16pt;margin:0">${esc(A.azienda.ragione)}</p>
-        <h1 style="font-size:40pt;margin:6mm 0">Timbra qui</h1>
-        <p style="font-size:20pt;margin:0 0 8mm">${esc(q.nome)}</p>
-        <div style="display:inline-block;width:120mm">${c.createSvgTag({ cellSize: 8, margin: 2, scalable: true })}</div>
-        <p style="font-size:15pt;margin:8mm 0 0">Apri l'app Pro Farmer → «Inquadra il QR».<br>Oppure inquadralo con la fotocamera del telefono.</p>
-        <p style="font-size:10pt;margin:10mm 0 0;color:#555">Il QR segna solo l'ora di entrata e di uscita. Nessuna posizione in continuo, nessun dato biometrico.</p></div>`;
-      setTimeout(() => window.print(), 80);
-    }).catch(e => toast(e.message));
   }
   function foglioRegole() {
     const z = A.azienda;
@@ -1239,7 +1179,7 @@ const PF = (() => {
   /* --------------------------- la timbratura dal proprio account (30/10/2026)
      Il dipendente entra con la sua e-mail e la sua password (lo invita il
      titolare) e preme «Entrata» / «Uscita». Il controllo lo sceglie il titolare:
-     la posizione solo in quel momento, il QR appeso in azienda o niente. */
+     la posizione solo in quel momento o niente. */
   function posizioneOra() {
     if (DEMO) return Promise.resolve({ lat: 45.2, lon: 10.0, precisione: 15 });
     if (!navigator.geolocation) return Promise.resolve(null);
@@ -1249,27 +1189,23 @@ const PF = (() => {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }));
   }
 
-  function timbraIo(verso, codiceQr) {
-    const v = A.azienda.verifica;
-    if (v === 'qr' && !codiceQr) {
-      if (DEMO) return timbraIo(verso, PFDemo.codicePunto());
-      return inquadra(c => timbraIo(verso, c));
-    }
+  function timbraIo(verso) {
+    const v = A.azienda.verifica === 'nessuna' ? 'nessuna' : 'posizione';   // il QR non c'è più (2/11/2026)
     const quando = new Date().toISOString(), chiave = nuovaChiave();
-    const b = document.querySelector('[data-az="timbra-io"]'); if (b) { b.disabled = true; b.textContent = v === 'posizione' ? 'Controllo la posizione…' : 'Un attimo…'; }
+    const b = document.querySelector('[data-az="timbra-io"]'); if (b) { b.disabled = true; b.textContent = v === 'posizione' ? L('Controllo la posizione…') : L('Un attimo…'); }
     (v === 'posizione' ? posizioneOra() : Promise.resolve(null)).then(pos => {
-      const args = { p_verso: verso, p_ora_telefono: quando, p_chiave: chiave, p_codice: codiceQr || null,
+      const args = { p_verso: verso, p_ora_telefono: quando, p_chiave: chiave, p_codice: null,
         p_lat: pos ? pos.lat : null, p_lon: pos ? pos.lon : null, p_precisione: pos ? pos.precisione : null };
       rpc('pf_timbra_io', args).then(r => {
-        const nota = r.area === 'fuori' ? ' Risulti fuori dall’area dell’azienda: il titolare lo vede.'
-          : r.area === 'nd' ? ' Segnata senza posizione: dai il permesso della posizione all’app.' : '';
-        esito(true, r.verso === 'entrata' ? 'Entrata' : 'Uscita', `${r.gia ? 'Era già segnata alle' : 'Alle'} ${ora(r.quando)}.${nota}`);
+        const nota = r.area === 'fuori' ? ' ' + L('Risulti fuori dall’area dell’azienda: il titolare lo vede.')
+          : r.area === 'nd' ? ' ' + L('Segnata senza posizione: dai il permesso della posizione all’app.') : '';
+        esito(true, r.verso === 'entrata' ? L('Entrata') : L('Uscita'), L(r.gia ? 'Era già segnata alle {ora}.' : 'Alle {ora}.', { ora: ora(r.quando) }) + nota);
         aggiorna();
       }).catch(e => {
-        if (e.delDatabase) { esito(false, 'Non segnata', e.message); disegna(); return; }
+        if (e.delDatabase) { esito(false, L('Non segnata'), e.message); disegna(); return; }
         metti({ tipo: 'io', args });
-        A.timbrature.push({ id: chiave, persona: A.io.id, verso, quando, modo: codiceQr ? 'qr' : 'telefono', valida: true });
-        esito(true, 'Salvata sul telefono', `Sei senza rete: la timbratura delle ${ora(quando)} parte appena torna il segnale.`);
+        A.timbrature.push({ id: chiave, persona: A.io.id, verso, quando, modo: 'telefono', valida: true });
+        esito(true, L('Salvata sul telefono'), L('Sei senza rete: la timbratura delle {ora} parte appena torna il segnale.', { ora: ora(quando) }));
         disegna();
       });
     });
@@ -1316,7 +1252,7 @@ const PF = (() => {
   function vCompiti() {
     return A.mansioni.length ? A.mansioni.map(m => `<div class="scheda"><h2 style="font-size:18px;font-weight:800">${esc(m.titolo)}</h2>
       <p style="white-space:pre-line;margin-top:6px;color:var(--testo-2)">${esc(m.istruzioni)}</p></div>`).join('')
-      : '<p class="lista-vuota">Il titolare non ha ancora scritto i compiti.</p>';
+      : `<p class="lista-vuota">${L('Il titolare non ha ancora scritto i compiti.')}</p>`;
   }
   /* Il tema (2/11/2026): scuro (com'era), chiaro, o come il telefono. Resta sul
      telefono (localStorage), lo applica anche index.html prima di disegnare. */
@@ -1329,19 +1265,26 @@ const PF = (() => {
   }
   matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (temaScelto() === 'auto') applicaTema('auto'); });
   function vProfilo() {
-    return `<h2 class="sezione">Il tuo profilo</h2>
-      <div class="scheda"><div class="riga"><span>${esc(nome(A.io))}</span><span class="dx">${A.io.ruolo === 'titolare' ? 'Titolare' : 'Dipendente'}</span></div>
-        <div class="riga"><span>Azienda</span><span class="dx">${esc(A.azienda.ragione)}</span></div>
-        ${A.io.email ? `<div class="riga"><span>E-mail</span><span class="dx">${esc(A.io.email)}</span></div>` : ''}
-        <div class="riga"><span>Avvisi su questo telefono</span><span class="dx" id="stato-avvisi">…</span></div>
-        <div class="riga-bottoni" style="margin-top:10px"><button class="btn sec" data-az="notifiche" id="b-notifiche">Attiva gli avvisi</button>
-        ${A.io.email ? '<button class="btn sec" data-az="cambia-password">Cambia la password</button>' : ''}</div>
-        <div class="riga" style="margin-top:12px;border:0"><span>Aspetto</span></div>
-        <div class="tema-scelta" role="group" aria-label="Aspetto dell'app">${[['scuro', 'Scuro'], ['chiaro', 'Chiaro'], ['auto', 'Come il telefono']].map(([k, t]) =>
-          `<button data-az="tema" data-tema="${k}" aria-pressed="${temaScelto() === k}">${t}</button>`).join('')}</div></div>
-      <p class="sotto">I tuoi dati: li tratta la tua azienda, e Pro Farmer per suo conto. Solo presenze, niente posizione in continuo né dati biometrici.
-        <a href="https://www.iubenda.com/privacy-policy/12376136" target="_blank" rel="noopener">Informativa privacy</a>.</p>
-      <button class="btn chiaro" data-az="esci">Esci</button>`;
+    return `<h2 class="sezione">${L('Il tuo profilo')}</h2>
+      <div class="scheda"><div class="riga"><span>${esc(nome(A.io))}</span><span class="dx">${A.io.ruolo === 'titolare' ? L('Titolare') : L('Dipendente')}</span></div>
+        <div class="riga"><span>${L('Azienda')}</span><span class="dx">${esc(A.azienda.ragione)}</span></div>
+        ${A.io.email ? `<div class="riga"><span>${L('E-mail')}</span><span class="dx">${esc(A.io.email)}</span></div>` : ''}
+        ${titolare() ? '' : `<div class="riga"><label for="lingua-profilo">${L('Lingua')}</label><span class="dx">${sceltaLingua('lingua-profilo')}</span></div>`}
+        <div class="riga"><span>${L('Avvisi su questo telefono')}</span><span class="dx" id="stato-avvisi">…</span></div>
+        <div class="riga-bottoni" style="margin-top:10px"><button class="btn sec" data-az="notifiche" id="b-notifiche">${L('Attiva gli avvisi')}</button>
+        ${A.io.email ? `<button class="btn sec" data-az="cambia-password">${L('Cambia la password')}</button>` : ''}</div>
+        <div class="riga" style="margin-top:12px;border:0"><span>${L('Aspetto')}</span></div>
+        <div class="tema-scelta" role="group" aria-label="${L('Aspetto')}">${[['scuro', 'Scuro'], ['chiaro', 'Chiaro'], ['auto', 'Come il telefono']].map(([k, t]) =>
+          `<button data-az="tema" data-tema="${k}" aria-pressed="${temaScelto() === k}">${L(t)}</button>`).join('')}</div></div>
+      <p class="sotto">${L('I tuoi dati: li tratta la tua azienda, e Pro Farmer per suo conto. Solo presenze, niente posizione in continuo né dati biometrici.')}
+        <a href="https://www.iubenda.com/privacy-policy/12376136" target="_blank" rel="noopener">${L('Informativa privacy')}</a>.</p>
+      <button class="btn chiaro" data-az="esci">${L('Esci')}</button>`;
+  }
+  // il dipendente cambia la sua lingua (3/11/2026): resta sul telefono e nella sua scheda
+  function cambiaLingua(l) {
+    impostaLingua(l, true);
+    if (A && A.io) { A.io.lingua = l; rpc('pf_salva_lingua', { p_lingua: l }).catch(() => {}); }
+    disegna(); toast(L('Lingua cambiata.'));
   }
 
   /* ---------------------------------------------------------- notifiche */
@@ -1356,12 +1299,12 @@ const PF = (() => {
     if (suIPhone && !installata) return toast('Su iPhone: prima Condividi → «Aggiungi alla schermata Home», poi apri l’app da lì.');
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return toast('Questo telefono non riceve notifiche dall’app.');
     Notification.requestPermission().then(perm => {
-      if (perm !== 'granted') { riempiAvvisi(); return toast('Avvisi non permessi: si cambiano nelle impostazioni del telefono.'); }
+      if (perm !== 'granted') { riempiAvvisi(); return toast(L('Avvisi non permessi: si cambiano nelle impostazioni del telefono.')); }
       return navigator.serviceWorker.ready
         .then(reg => reg.pushManager.getSubscription().then(s => s || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chiaveVapid() })))
         .then(s => rpc('pf_salva_iscrizione', { s: { ...s.toJSON(), dispositivo: navigator.userAgent.slice(0, 200) } }))
-        .then(() => { statoNotifiche.salvata = true; toast('Avvisi attivi su questo telefono.'); riempiAvvisi(); const box = document.getElementById('avvisi-box'); if (box) box.innerHTML = ''; });
-    }).catch(() => toast('Non riesco ad attivare le notifiche: riprova.'));
+        .then(() => { statoNotifiche.salvata = true; toast(L('Avvisi attivi su questo telefono.')); riempiAvvisi(); const box = document.getElementById('avvisi-box'); if (box) box.innerHTML = ''; });
+    }).catch(() => toast(L('Non riesco ad attivare le notifiche: riprova.')));
   }
   /* Lo stato degli avvisi su questo telefono (dal 3/11/2026): 'attive',
      'spente', 'negate', 'installa' (iPhone senza l'app sulla schermata Home)
@@ -1391,20 +1334,20 @@ const PF = (() => {
     if (!box && !riga) return;
     statoNotifiche().then(st => {
       const b = document.getElementById('b-notifiche');
-      if (riga) riga.innerHTML = { attive: '<b style="color:var(--verde)">attivi</b>', spente: 'spenti', negate: '<b style="color:var(--rosso)">bloccati</b>',
-        installa: 'prima installa l’app', no: 'questo telefono non li riceve' }[st];
-      if (b) { b.hidden = st === 'attive' || st === 'no'; b.textContent = st === 'negate' ? 'Come sbloccarli' : 'Attiva gli avvisi'; }
+      if (riga) riga.innerHTML = { attive: `<b style="color:var(--verde)">${L('attivi')}</b>`, spente: L('spenti'), negate: `<b style="color:var(--rosso)">${L('bloccati')}</b>`,
+        installa: L('prima installa l’app'), no: L('questo telefono non li riceve') }[st];
+      if (b) { b.hidden = st === 'attive' || st === 'no'; b.textContent = st === 'negate' ? L('Come sbloccarli') : L('Attiva gli avvisi'); }
       if (!box || st === 'attive' || st === 'no' || DEMO && !location.search.includes('avvisi')) return;
       if (Date.now() < Number(leggi(K_AVVISI_DOPO, 0))) return;
       const perche = titolare() ? 'Così sai subito chi esce oltre l’orario e chi chiede ferie o riposi.'
-        : 'Così sai subito quando escono i turni nuovi e quando il titolare risponde alle tue richieste.';
+        : L('Così sai subito quando escono i turni nuovi e quando il titolare risponde alle tue richieste.');
       const come = {
-        installa: 'Su iPhone gli avvisi arrivano solo con l’app sulla schermata Home: in Safari tocca <b>Condividi</b> → <b>Aggiungi alla schermata Home</b>, poi apri Easy da lì.',
-        negate: 'Gli avvisi sono bloccati: si sbloccano nelle impostazioni del telefono (Notifiche → il browser o Easy).',
+        installa: esc(L('Su iPhone gli avvisi arrivano solo con l’app sulla schermata Home: in Safari tocca Condividi → Aggiungi alla schermata Home, poi apri Easy da lì.')),
+        negate: esc(L('Gli avvisi sono bloccati: si sbloccano nelle impostazioni del telefono (Notifiche → il browser o Easy).')),
         spente: perche }[st];
-      box.innerHTML = `<div class="scheda avvisi-box"><b>Attiva gli avvisi</b><p class="sotto" style="margin:4px 0 10px">${come}</p>
-        <div class="riga-bottoni">${st === 'spente' ? '<button class="btn piccolo" data-az="notifiche">Attiva gli avvisi</button>' : ''}
-        <button class="btn sec piccolo" data-az="avvisi-dopo">Più tardi</button></div></div>`;
+      box.innerHTML = `<div class="scheda avvisi-box"><b>${L('Attiva gli avvisi')}</b><p class="sotto" style="margin:4px 0 10px">${come}</p>
+        <div class="riga-bottoni">${st === 'spente' ? `<button class="btn piccolo" data-az="notifiche">${L('Attiva gli avvisi')}</button>` : ''}
+        <button class="btn sec piccolo" data-az="avvisi-dopo">${L('Più tardi')}</button></div></div>`;
     });
   }
   function togliNotifiche() {
@@ -1500,7 +1443,7 @@ const PF = (() => {
 
   /* --------------------------------------------------------- i tocchi */
   const AZ = {
-    esci, notifiche: attivaNotifiche, inquadra,
+    esci, notifiche: attivaNotifiche,
     'avvisi-dopo': () => { scrivi(K_AVVISI_DOPO, Date.now() + 3 * 864e5); const box = document.getElementById('avvisi-box'); if (box) box.innerHTML = ''; },
     'cambia-password': () => {
       if (DEMO) return toast('Nella app vera scegli qui una password nuova.');
@@ -1517,14 +1460,14 @@ const PF = (() => {
       if (!ok || !ok.checked) { document.getElementById('nomina-err').textContent = 'Spunta la casella per accettare.'; return; }
       b.disabled = true; b.textContent = 'Un attimo…';
       rpc('pf_accetta_nomina', { p_versione: Documenti.VERSIONE })
-        .then(() => aggiorna('Fatto. Adesso aggiungi le persone e stampa il QR.'))
+        .then(() => aggiorna('Fatto. Adesso aggiungi le persone e manda loro l’accesso.'))
         .catch(e => { b.disabled = false; b.textContent = 'Accetto e comincio'; document.getElementById('nomina-err').textContent = motivo(e); });
     },
-    'qr-demo': () => timbraQR(PFDemo.codicePunto()),
     'timbra-per': b => timbraPer(b.dataset.id),
     'timbra-per-ora': () => foglioTimbraPerOra(),
     correggi: b => foglioCorreggi(A.timbrature.find(t => t.id === b.dataset.id)),
-    sett: b => { settimana = Conti.piuGiorni(settimana, Number(b.dataset.n)); disegna(); },
+    sett: b => { settimana = Conti.piuGiorni(settimana, Number(b.dataset.n)); giornoVisto = Conti.piuGiorni(giornoVisto, Number(b.dataset.n)); disegna(); },
+    'giorno-visto': b => { giornoVisto = b.dataset.giorno; disegna(); },
     tipi: () => foglioTipi(),
     cella: b => foglioCella(b.dataset.tipo, b.dataset.giorno),
     lavori: b => foglioLavori(b.dataset.giorno),
@@ -1545,13 +1488,11 @@ const PF = (() => {
     decidi: b => rpc('pf_decidi_assenza', { p_id: b.dataset.id, p_esito: b.dataset.esito })
       .then(() => aggiorna({ approvata: 'Approvata: gli arriva la notifica.', rifiutata: 'Non approvata: gli arriva la notifica.', annullata: 'Tolta.' }[b.dataset.esito]))
       .catch(e => toast(motivo(e))),
-    ritira: b => rpc('pf_ritira_assenza', { p_id: b.dataset.id }).then(() => aggiorna('Richiesta ritirata.')).catch(e => toast(motivo(e))),
+    ritira: b => rpc('pf_ritira_assenza', { p_id: b.dataset.id }).then(() => aggiorna(L('Richiesta ritirata.'))).catch(e => toast(motivo(e))),
     dettaglio: b => { const el = document.getElementById('mese-dati'); if (el && el._fogli) dettaglio(el._fogli[Number(b.dataset.i)]); },
     excel: () => { const el = document.getElementById('mese-dati'); if (el && el._fogli) excel(el._fogli); },
     stampa: () => { const el = document.getElementById('mese-dati'); if (el && el._fogli) stampa(el._fogli); },
     persona: b => foglioPersona(b.dataset.id ? persona(b.dataset.id) : null),
-    punto: b => foglioPunto(b.dataset.id ? A.punti.find(q => q.id === b.dataset.id) : null),
-    'stampa-qr': b => stampaQR(A.punti.find(q => q.id === b.dataset.id)),
     regole: () => foglioRegole(),
     mansione: b => foglioMansione(b.dataset.id ? A.mansioni.find(m => m.id === b.dataset.id) : null),
     tema: b => { applicaTema(b.dataset.tema); document.querySelectorAll('[data-az="tema"]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); },
@@ -1567,6 +1508,8 @@ const PF = (() => {
     if (ev.key === 'Enter' && ev.target.matches('tr[data-az]')) ev.target.click();
   });
   document.addEventListener('change', ev => {
+    if (ev.target.id === 'lingua-profilo') return cambiaLingua(ev.target.value);
+    if (ev.target.id === 'lingua-accesso') { impostaLingua(ev.target.value, true); const el = document.getElementById('email'); if (el) emailAccesso = el.value.trim(); return mostraAccesso(); }
     if (ev.target.id !== 'demo-chi') return;
     const v = ev.target.value;
     PFDemo.diventa(v); location.hash = ''; carica();
@@ -1586,27 +1529,22 @@ const PF = (() => {
     const h = location.hash;
     if (/#collega=/.test(h)) return collegamentoVecchio();
     if (h === '#primo-accesso' && !A) return mostraPrimo();
-    const c = codiceDa(h);
-    if (c && A) { history.replaceState(null, '', location.pathname + location.search + '#timbra'); return timbraQR(c); }
     if (A) disegna();
   });
 
   function parti() {
     if ('serviceWorker' in navigator && !DEMO && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
     if (/#collega=/.test(location.hash)) return collegamentoVecchio();
-    // il tablet di stalla non c'è più (31/10/2026): via la sua chiave e l'indirizzo #chiosco
-    if (!DEMO && leggi(K_CHIOSCO, null)) scrivi(K_CHIOSCO, null);
-    if (location.hash === '#chiosco') history.replaceState(null, '', location.pathname + location.search);
-    const qr = codiceDa(location.hash);
-    if (DEMO) return carica(() => { disegna(); if (qr) timbraQR(qr); });
+    // il tablet di stalla (31/10/2026) e i QR (2/11/2026) non ci sono più: via la chiave e gli indirizzi vecchi
+    if (!DEMO) scrivi('pf-chiosco', null);
+    if (location.hash === '#chiosco' || /^#t=/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search);
+    if (DEMO) return carica(() => disegna());
     collegamento().auth.getSession().then(({ data }) => {
       try { localStorage.removeItem('pf-telefono'); } catch (e) {}   // il vecchio collegamento senza e-mail (fino al 30/10/2026)
       if (!data.session) return location.hash === '#primo-accesso' ? mostraPrimo()
-        : mostraAccesso(qr ? 'Entra con la tua e-mail, poi inquadra di nuovo il QR.' : '');
+        : mostraAccesso('');
       if (location.hash === '#primo-accesso') history.replaceState(null, '', location.pathname + location.search);
-      carica(() => {
-        if (qr) { history.replaceState(null, '', location.pathname + '#timbra'); disegna(); timbraQR(qr); } else disegna();
-      });
+      carica(() => disegna());
     });
   }
   return { parti };

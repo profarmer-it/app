@@ -19,9 +19,9 @@ const PFDemo = (() => {
   function nuovi() {
     const persone = [
       { id: 'p-marco', nome: 'Marco', cognome: 'Rossi', ruolo: 'titolare', email: 'marco@cascinademo.it', ore_giorno: 9, pin: '2580' },
-      { id: 'p-ion', nome: 'Ion', cognome: 'Popescu', ruolo: 'dipendente', email: 'ion@cascinademo.it', ore_giorno: 9, pin: '1470' },
-      { id: 'p-raji', nome: 'Rajinder', cognome: 'Singh', ruolo: 'dipendente', email: '', ore_giorno: 9, pin: '3690' },
-      { id: 'p-samir', nome: 'Samir', cognome: 'Benali', ruolo: 'dipendente', email: 'samir@cascinademo.it', ore_giorno: 9, pin: '1593' },
+      { id: 'p-ion', nome: 'Ion', cognome: 'Popescu', ruolo: 'dipendente', email: 'ion@cascinademo.it', ore_giorno: 9, pin: '1470', nazionalita: 'Romania', lingua: 'ro' },
+      { id: 'p-raji', nome: 'Rajinder', cognome: 'Singh', ruolo: 'dipendente', email: '', ore_giorno: 9, pin: '3690', nazionalita: 'India', lingua: 'pa' },
+      { id: 'p-samir', nome: 'Samir', cognome: 'Benali', ruolo: 'dipendente', email: 'samir@cascinademo.it', ore_giorno: 9, pin: '1593', nazionalita: 'Egitto', lingua: 'ar' },
       { id: 'p-luca', nome: 'Luca', cognome: 'Ferrari', ruolo: 'dipendente', email: 'luca@cascinademo.it', ore_giorno: 9, pin: '7531' },
       { id: 'p-ahmed', nome: 'Ahmed', cognome: 'Khan', ruolo: 'dipendente', email: '', ore_giorno: 9, pin: '8462' }
     ].map(p => ({ ...p, attivo: true, invitato: !!p.email, dal: '2025-01-01', al: null }));
@@ -168,7 +168,8 @@ const PFDemo = (() => {
   const F = {
     pf_area() {
       const tit = me().ruolo === 'titolare';
-      const pubblica = p => ({ id: p.id, nome: p.nome, cognome: p.cognome, ruolo: p.ruolo,
+      const pubblica = p => ({ id: p.id, nome: p.nome, cognome: p.cognome, ruolo: p.ruolo, lingua: p.lingua || 'it',
+        ...(tit ? { nazionalita: p.nazionalita || '' } : {}),
         ...(tit ? { email: p.email, ore_giorno: p.ore_giorno, pin: !!p.pin, attivo: p.attivo, invitato: p.invitato, dal: p.dal, al: p.al } : {}) });
       return {
         ok: true, attiva: true, demo: true,
@@ -226,12 +227,12 @@ const PFDemo = (() => {
       if (p.id) {
         const x = persona(p.id);
         Object.assign(x, { nome: p.nome.trim(), cognome: (p.cognome || '').trim(), email: (p.email || '').trim().toLowerCase(),
-          ore_giorno: Number(p.ore_giorno || x.ore_giorno) });
+          ore_giorno: Number(p.ore_giorno || x.ore_giorno), ...(p.lingua ? { nazionalita: p.nazionalita || '', lingua: p.lingua } : {}) });
         if (x.id !== io && p.attivo !== undefined) { x.attivo = !!p.attivo; x.al = p.attivo ? null : Conti.oggi(); }
         salva(); return { ok: true, id: x.id };
       }
       const x = { id: id(), nome: p.nome.trim(), cognome: (p.cognome || '').trim(), ruolo: 'dipendente', email: (p.email || '').trim().toLowerCase(),
-        ore_giorno: Number(p.ore_giorno || 9), attivo: true, invitato: false, dal: Conti.oggi(), al: null, pin: null };
+        ore_giorno: Number(p.ore_giorno || 9), nazionalita: p.nazionalita || '', lingua: p.lingua || 'it', attivo: true, invitato: false, dal: Conti.oggi(), al: null, pin: null };
       d.persone.push(x); salva(); return { ok: true, id: x.id };
     },
     pf_salva_punto({ p }) {
@@ -375,6 +376,7 @@ const PFDemo = (() => {
       salva(); return { ok: true };
     },
     pf_salva_iscrizione() { return { ok: true }; },
+    pf_salva_lingua({ p_lingua }) { me().lingua = p_lingua; salva(); return { ok: true }; },
     pf_togli_iscrizione() { return { ok: true }; }
   };
 
