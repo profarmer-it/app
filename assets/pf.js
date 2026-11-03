@@ -388,7 +388,7 @@ const PF = (() => {
     ferie: '<path d="M12 3v18M5 8c2-3 12-3 14 0M5 8c0 3 3 4 7 4s7-1 7-4"/>',
     mese: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     altro: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
-    timbra: '<rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><path d="M14 14h2v2M18 14h2M14 18h2M18 18h2v2"/>',
+    timbra: '<path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>',
     compiti: '<path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>',
     profilo: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>'
   };
@@ -438,6 +438,7 @@ const PF = (() => {
         `<a href="#${k}" class="${k === v ? 'su' : ''}"${k === v ? ' aria-current="page"' : ''}>${svg(k)}${t}`
         + (k === 'ferie' && daDecidere ? `<span class="pallino">${daDecidere}</span>` : '') + '</a>').join('')}</div></nav>`;
     if (v === 'timbra') avviaOrologio();
+    riempiAvvisi();
     window.scrollTo(0, 0);
   }
 
@@ -460,6 +461,7 @@ const PF = (() => {
     const { dip, dentro, assenti } = chiDentro();
     const chieste = A.assenze.filter(a => a.stato === 'chiesta').length;
     return `<div><p class="saluto">${saluto()}, ${esc(A.io.nome)}</p><p class="sotto">${esc(A.azienda.ragione)}</p></div>
+      <div id="avvisi-box"></div>
       <a href="#oggi" class="scheda forte app-card" style="text-decoration:none">
         <span class="ico" style="background:var(--inchiostro);color:var(--arancio)">${svg('oggi')}</span>
         <span><b>Presenze e turni</b><span class="sotto">Adesso in stalla ${dentro.length} su ${dip.length}${assenti.length ? ` · ${assenti.length} assent${assenti.length > 1 ? 'i' : 'e'}` : ''}.</span>
@@ -551,6 +553,7 @@ const PF = (() => {
       <button class="btn enorme" data-az="timbra-io" data-verso="${dentro ? 'uscita' : 'entrata'}">${verifica === 'qr' ? svg('timbra') + ' ' : ''}${dentro ? 'Uscita · fine lavoro' : 'Entrata · inizio lavoro'}</button>
       <p class="sotto" style="text-align:center">${verifica === 'posizione' ? 'Quando premi, il telefono dice solo se sei in azienda. Nessun tracciamento.'
         : verifica === 'qr' ? 'Dopo il tocco inquadra il QR appeso in azienda.' : ''}</p>
+      <div id="avvisi-box"></div>
       ${coda.length ? `<div class="avviso">${coda.length === 1 ? 'Una timbratura è salvata' : coda.length + ' timbrature sono salvate'} sul telefono:
         partono da sole quando torna la rete.</div>` : ''}
       <div class="scheda"><h2 class="sezione" style="margin:0 0 2px">Il tuo turno di oggi</h2>
@@ -566,8 +569,11 @@ const PF = (() => {
   /* Il contatore dopo l'entrata (dal 31/10/2026): da quanto si lavora, quando
      finisce il turno e, dopo, di quanto lo si è passato. */
   function contatore(dal) {
-    const o = Conti.oltre(A.timbrature, A.io, A.turni, null) || { presenza: Math.floor((Date.now() - new Date(dal)) / 60000), durata: Conti.durataTurno(A.io, A.turni, Conti.oggi()), get minuti() { return this.presenza - this.durata; } };
-    const fine = new Date(new Date(dal).getTime() + o.durata * 60000).toISOString();
+    const o = Conti.oltre(A.timbrature, A.io, A.turni, null) || (() => {
+      const durata = Conti.durataTurno(A.io, [], Conti.oggi()), f = new Date(new Date(dal).getTime() + durata * 60000);
+      return { presenza: Math.floor((Date.now() - new Date(dal)) / 60000), durata, fine: f, minuti: Math.floor((Date.now() - f) / 60000) };
+    })();
+    const fine = o.fine.toISOString();
     const oltre = o.minuti > 0;
     // il cronometro scorre al secondo (2/11/2026): «0 min» fermo sembrava non partire
     const sec = Math.max(0, Math.floor((Date.now() - new Date(dal)) / 1000));
@@ -1327,7 +1333,8 @@ const PF = (() => {
       <div class="scheda"><div class="riga"><span>${esc(nome(A.io))}</span><span class="dx">${A.io.ruolo === 'titolare' ? 'Titolare' : 'Dipendente'}</span></div>
         <div class="riga"><span>Azienda</span><span class="dx">${esc(A.azienda.ragione)}</span></div>
         ${A.io.email ? `<div class="riga"><span>E-mail</span><span class="dx">${esc(A.io.email)}</span></div>` : ''}
-        <div class="riga-bottoni" style="margin-top:10px"><button class="btn sec" data-az="notifiche" id="b-notifiche">Notifiche</button>
+        <div class="riga"><span>Avvisi su questo telefono</span><span class="dx" id="stato-avvisi">…</span></div>
+        <div class="riga-bottoni" style="margin-top:10px"><button class="btn sec" data-az="notifiche" id="b-notifiche">Attiva gli avvisi</button>
         ${A.io.email ? '<button class="btn sec" data-az="cambia-password">Cambia la password</button>' : ''}</div>
         <div class="riga" style="margin-top:12px;border:0"><span>Aspetto</span></div>
         <div class="tema-scelta" role="group" aria-label="Aspetto dell'app">${[['scuro', 'Scuro'], ['chiaro', 'Chiaro'], ['auto', 'Come il telefono']].map(([k, t]) =>
@@ -1349,12 +1356,56 @@ const PF = (() => {
     if (suIPhone && !installata) return toast('Su iPhone: prima Condividi → «Aggiungi alla schermata Home», poi apri l’app da lì.');
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return toast('Questo telefono non riceve notifiche dall’app.');
     Notification.requestPermission().then(perm => {
-      if (perm !== 'granted') return toast('Notifiche non permesse: si cambiano nelle impostazioni del telefono.');
+      if (perm !== 'granted') { riempiAvvisi(); return toast('Avvisi non permessi: si cambiano nelle impostazioni del telefono.'); }
       return navigator.serviceWorker.ready
         .then(reg => reg.pushManager.getSubscription().then(s => s || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chiaveVapid() })))
         .then(s => rpc('pf_salva_iscrizione', { s: { ...s.toJSON(), dispositivo: navigator.userAgent.slice(0, 200) } }))
-        .then(() => toast('Notifiche attive su questo telefono.'));
+        .then(() => { statoNotifiche.salvata = true; toast('Avvisi attivi su questo telefono.'); riempiAvvisi(); const box = document.getElementById('avvisi-box'); if (box) box.innerHTML = ''; });
     }).catch(() => toast('Non riesco ad attivare le notifiche: riprova.'));
+  }
+  /* Lo stato degli avvisi su questo telefono (dal 3/11/2026): 'attive',
+     'spente', 'negate', 'installa' (iPhone senza l'app sulla schermata Home)
+     o 'no' (il telefono non le riceve). Se sono attive, l'iscrizione si
+     risalva a ogni apertura: così resta legata alla persona giusta. */
+  function statoNotifiche() {
+    if (DEMO) return Promise.resolve('spente');
+    const suIPhone = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const installata = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+    if (suIPhone && !installata) return Promise.resolve('installa');
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return Promise.resolve('no');
+    if (Notification.permission === 'denied') return Promise.resolve('negate');
+    if (Notification.permission !== 'granted') return Promise.resolve('spente');
+    return navigator.serviceWorker.getRegistration().then(reg => reg && reg.pushManager.getSubscription())
+      .then(sub => {
+        if (!sub) return 'spente';
+        if (!statoNotifiche.salvata) {
+          statoNotifiche.salvata = true;
+          rpc('pf_salva_iscrizione', { s: { ...sub.toJSON(), dispositivo: navigator.userAgent.slice(0, 200) } }).catch(() => {});
+        }
+        return 'attive';
+      }).catch(() => 'spente');
+  }
+  const K_AVVISI_DOPO = 'pf-avvisi-dopo';
+  function riempiAvvisi() {
+    const box = document.getElementById('avvisi-box'), riga = document.getElementById('stato-avvisi');
+    if (!box && !riga) return;
+    statoNotifiche().then(st => {
+      const b = document.getElementById('b-notifiche');
+      if (riga) riga.innerHTML = { attive: '<b style="color:var(--verde)">attivi</b>', spente: 'spenti', negate: '<b style="color:var(--rosso)">bloccati</b>',
+        installa: 'prima installa l’app', no: 'questo telefono non li riceve' }[st];
+      if (b) { b.hidden = st === 'attive' || st === 'no'; b.textContent = st === 'negate' ? 'Come sbloccarli' : 'Attiva gli avvisi'; }
+      if (!box || st === 'attive' || st === 'no' || DEMO && !location.search.includes('avvisi')) return;
+      if (Date.now() < Number(leggi(K_AVVISI_DOPO, 0))) return;
+      const perche = titolare() ? 'Così sai subito chi esce oltre l’orario e chi chiede ferie o riposi.'
+        : 'Così sai subito quando escono i turni nuovi e quando il titolare risponde alle tue richieste.';
+      const come = {
+        installa: 'Su iPhone gli avvisi arrivano solo con l’app sulla schermata Home: in Safari tocca <b>Condividi</b> → <b>Aggiungi alla schermata Home</b>, poi apri Easy da lì.',
+        negate: 'Gli avvisi sono bloccati: si sbloccano nelle impostazioni del telefono (Notifiche → il browser o Easy).',
+        spente: perche }[st];
+      box.innerHTML = `<div class="scheda avvisi-box"><b>Attiva gli avvisi</b><p class="sotto" style="margin:4px 0 10px">${come}</p>
+        <div class="riga-bottoni">${st === 'spente' ? '<button class="btn piccolo" data-az="notifiche">Attiva gli avvisi</button>' : ''}
+        <button class="btn sec piccolo" data-az="avvisi-dopo">Più tardi</button></div></div>`;
+    });
   }
   function togliNotifiche() {
     if (DEMO || !('serviceWorker' in navigator)) return Promise.resolve();
@@ -1450,6 +1501,7 @@ const PF = (() => {
   /* --------------------------------------------------------- i tocchi */
   const AZ = {
     esci, notifiche: attivaNotifiche, inquadra,
+    'avvisi-dopo': () => { scrivi(K_AVVISI_DOPO, Date.now() + 3 * 864e5); const box = document.getElementById('avvisi-box'); if (box) box.innerHTML = ''; },
     'cambia-password': () => {
       if (DEMO) return toast('Nella app vera scegli qui una password nuova.');
       emailAccesso = A.io.email || emailAccesso;

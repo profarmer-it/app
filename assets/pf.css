@@ -283,3 +283,4 @@ a.btn{text-decoration:none}
 .spunta-nota{display:flex;align-items:center;gap:8px;justify-content:space-between}
 .spunta-nota .nota{flex:0 1 45%;min-width:0;padding:6px 8px;font-size:14px}
 .lavoro{font-size:14px;color:var(--testo-2);border-left:3px solid var(--arancio);padding:2px 0 2px 10px;margin:6px 0;white-space:pre-line}
+.avvisi-box{border:1px solid var(--arancio)}

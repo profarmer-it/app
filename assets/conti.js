@@ -152,7 +152,28 @@ const Conti = (() => {
     if (lista.length) return lista.reduce((n, u) => n + ((minuti(u.fine) - minuti(u.inizio) + 1440) % 1440 || 1440), 0);
     return Math.round(Number(persona.ore_giorno || 9) * 60);
   }
-  // I minuti oltre il turno di un'uscita (o di adesso, se è ancora dentro): null se non c'è l'entrata.
+  // L'istante di un'ora italiana: istante('2026-11-03', '09:00') → Date
+  function istante(g, hm) {
+    const prova = new Date(`${g}T${hm}:00Z`);
+    const r = roma(prova.toISOString());
+    return new Date(prova - (new Date(`${r.giorno}T${r.ora}:00Z`) - prova));
+  }
+  /* Il pezzo di turno di un'entrata (dal 3/11/2026): nei turni spezzati
+     (mungitura 5-9 e 16-20) conta quello che comincia più vicino all'entrata,
+     non la somma della giornata. null se quel giorno non ci sono turni. */
+  function pezzo(persona, turni, entrataIso) {
+    const g = roma(entrataIso).giorno, e = new Date(entrataIso);
+    const lista = turniDelGiorno(turni || [], persona.id, g).filter(u => u.inizio && u.fine).map(u => {
+      const inizio = istante(g, String(u.inizio).slice(0, 5));
+      let fine = istante(g, String(u.fine).slice(0, 5));
+      if (fine <= inizio) fine = new Date(fine.getTime() + 864e5);        // turno di notte
+      return { inizio, fine, durata: Math.round((fine - inizio) / 60000) };
+    });
+    return lista.sort((a, b) => Math.abs(a.inizio - e) - Math.abs(b.inizio - e))[0] || null;
+  }
+  /* I minuti oltre il turno di un'uscita (o di adesso, se è ancora dentro):
+     null se non c'è l'entrata. Con un turno segnato: i minuti dopo la sua
+     fine; senza: la presenza oltre l'orario della persona. */
   const TOLLERANZA = 15;                    // sotto i 15 minuti non si segnala
   function oltre(timbrature, persona, turni, uscita) {
     const fine = uscita ? new Date(uscita.quando) : new Date();
@@ -161,12 +182,14 @@ const Conti = (() => {
     if (!entrata) return null;
     if (uscita && valide(timbrature).some(x => x.persona === persona.id && x.verso === 'uscita' && x.quando > entrata.quando && x.quando < uscita.quando)) return null;
     const presenza = Math.floor((fine - new Date(entrata.quando)) / 60000);
-    return { entrata, presenza, durata: durataTurno(persona, turni, roma(entrata.quando).giorno),
-      get minuti() { return this.presenza - this.durata; } };
+    const p = pezzo(persona, turni, entrata.quando);
+    const durata = p ? p.durata : Math.round(Number(persona.ore_giorno || 9) * 60);
+    const termine = p ? p.fine : new Date(new Date(entrata.quando).getTime() + durata * 60000);
+    return { entrata, presenza, durata, fine: termine, minuti: Math.floor((fine - termine) / 60000) };
   }
   // 155 → '2 h 35 min'
   const durataTesto = m => { m = Math.max(0, Math.round(m)); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`; };
 
   return { roma, oggi, giorniDelMese, giornoSettimana, piuGiorni, lunediDi, coppie, foglio, dentro,
-    turniDelGiorno, hhmm, ore, valide, durataTurno, oltre, durataTesto, TOLLERANZA };
+    turniDelGiorno, hhmm, ore, valide, durataTurno, pezzo, oltre, durataTesto, TOLLERANZA };
 })();
