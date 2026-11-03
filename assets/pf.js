@@ -142,14 +142,14 @@ const PF = (() => {
       return (emailAccesso = e);
     };
     document.getElementById('crea').addEventListener('click', () => mostraCrea());
-    const primo = ev => {
+    const primo = modo => ev => {
       ev.preventDefault();
       const e = document.getElementById('email').value.trim().toLowerCase();
       if (e) emailAccesso = e;
-      mostraPrimo();
+      mostraPrimo(null, modo);
     };
-    document.getElementById('col-codice').addEventListener('click', primo);
-    document.getElementById('pw-persa').addEventListener('click', primo);
+    document.getElementById('col-codice').addEventListener('click', primo('primo'));
+    document.getElementById('pw-persa').addEventListener('click', primo('pw'));
     document.getElementById('f-email').addEventListener('submit', ev => {
       ev.preventDefault();
       const e = leggiEmail(); if (!e) return;
@@ -168,18 +168,24 @@ const PF = (() => {
   }
   // Primo accesso (o password dimenticata): e-mail, codice, password. Ci porta
   // anche il link dell'e-mail d'invito (#primo-accesso), dal 31/10/2026.
-  function mostraPrimo(msg) {
-    fermaOrologio(); ridisegnaAccesso = () => mostraPrimo();
+  /* Primo accesso o password dimenticata (separati dal 3/11/2026): e-mail,
+     codice, password. Nel primo accesso, prima del codice, si controlla se
+     l'e-mail ha già un account con una password (pf-controlla-email, richiesta
+     di Giulio): se sì, si dice di entrare o di usare «Password dimenticata?».
+     Ci porta anche il link dell'e-mail d'invito (#primo-accesso). */
+  function mostraPrimo(msg, modo) {
+    const pw = modo === 'pw';
+    fermaOrologio(); ridisegnaAccesso = () => mostraPrimo(null, modo);
     app().className = '';
     app().innerHTML = `<div class="accesso">
       <div class="testa-accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">${sceltaLingua('lingua-accesso')}</div>
-      <h1>${L('Primo accesso')}</h1>
-      <p class="sotto">${L('Si fa una volta sola, in tre passi. Vale anche se hai dimenticato la password.')}</p>
-      <ol class="passi">
+      <h1>${pw ? L('Password dimenticata?') : L('Primo accesso')}</h1>
+      <p class="sotto">${pw ? L('Ti mandiamo un codice per e-mail, poi scegli una password nuova.') : L('Si fa una volta sola, in tre passi.')}</p>
+      ${pw ? '' : `<ol class="passi">
         <li>${L('Scrivi la tua e-mail, quella a cui è arrivato l’invito.')}</li>
         <li>${L('Ti mandiamo un codice di 6 cifre: scrivilo qui.')}</li>
         <li>${L('Scegli la tua password. Dalla volta dopo entri con e-mail e password.')}</li>
-      </ol>
+      </ol>`}
       <form id="f-primo" class="campo" novalidate>
         <label for="p-email">${L('La tua e-mail')}</label>
         <input id="p-email" type="email" inputmode="email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" value="${esc(emailAccesso)}">
@@ -193,10 +199,34 @@ const PF = (() => {
     document.getElementById('f-primo').addEventListener('submit', ev => {
       ev.preventDefault();
       const e = document.getElementById('p-email').value.trim().toLowerCase();
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return mostraPrimo(L('Scrivi un’e-mail completa, per esempio nome@libero.it.'));
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return mostraPrimo(L('Scrivi un’e-mail completa, per esempio nome@libero.it.'), modo);
       emailAccesso = e;
-      chiediCodice(e, ev.currentTarget.querySelector('.btn'), false, mostraPrimo);
+      const b = ev.currentTarget.querySelector('.btn');
+      const torna = m => mostraPrimo(m, modo);
+      if (pw || DEMO) return chiediCodice(e, b, false, torna);
+      b.style.pointerEvents = 'none'; b.textContent = L('Controllo…');
+      // senza anti-robot, per non chiedere due volte la casella: frenano i limiti per IP ed e-mail (50-controllo-email.sql)
+      collegamento().functions.invoke('pf-controlla-email', { body: { email: e } })
+        .then(({ data }) => {
+          if (data && data.ok && data.stato === 'gia') return mostraGia();
+          if (data && data.ok && data.stato === 'troppi') return torna(L('Troppi tentativi: aspetta 15 minuti e riprova.'));
+          chiediCodice(e, b, false, torna);   // se il controllo non risponde si va avanti col codice
+        }, () => chiediCodice(e, b, false, torna));
     });
+  }
+  // L'e-mail ha già un account (3/11/2026): si entra con la password o la si reimposta.
+  function mostraGia() {
+    ridisegnaAccesso = () => mostraGia();
+    app().innerHTML = `<div class="accesso">
+      <div class="testa-accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">${sceltaLingua('lingua-accesso')}</div>
+      <h1>${L('Hai già un account')}</h1>
+      <div class="avviso" role="alert">${L('L’indirizzo {email} è già associato a un account.', { email: `<b>${esc(emailAccesso)}</b>` })}</div>
+      <p class="sotto">${L('Entra con la tua e-mail e la tua password. Se non ricordi la password, tocca «Password dimenticata?» e la reimposti con un codice per e-mail.')}</p>
+      <button class="btn pieno" id="gia-entra">${L('Entra')}</button>
+      <button class="btn sec pieno" id="gia-pw">${L('Password dimenticata?')}</button>
+    </div>`;
+    document.getElementById('gia-entra').addEventListener('click', () => { history.replaceState(null, '', location.pathname + location.search); mostraAccesso(); });
+    document.getElementById('gia-pw').addEventListener('click', () => mostraPrimo(null, 'pw'));
   }
   // Crea l'account: e-mail, codice, password; poi la richiesta a Pro Farmer.
   function mostraCrea(msg) {
@@ -267,7 +297,7 @@ const PF = (() => {
         // adesso, dopo il codice, così nessuno può provare quali e-mail sono iscritte
         collegamento().auth.getUser().then(({ data }) => {
           const gia = !!(data && data.user && data.user.user_metadata && data.user.user_metadata.password_scelta);
-          mostraPassword(() => carica(), gia, null, gia);
+          mostraPassword(() => carica(), gia, null, false);
         }, () => mostraPassword(() => carica(), false));
       });
     });
