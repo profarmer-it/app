@@ -227,7 +227,7 @@ const PF = (() => {
   function chiediCodice(e, el, crea, indietro) {
     if (el) { el.style.pointerEvents = 'none'; el.textContent = L('Mando il codice…'); }
     const torna = indietro || (crea ? mostraCrea : mostraAccesso);
-    Antirobot.token().then(captchaToken => collegamento().auth.signInWithOtp({ email: e, options: { shouldCreateUser: !!crea, data: crea ? { app: 'pf' } : undefined, emailRedirectTo: 'https://easy.profarmer.it/', captchaToken } })).then(({ error }) => {
+    Antirobot.token().then(captchaToken => collegamento().auth.signInWithOtp({ email: e, options: { shouldCreateUser: !!crea, data: crea ? { app: 'pf' } : undefined, emailRedirectTo: 'https://easy.profarmer.it/' + (LINGUA !== 'it' ? '?l=' + LINGUA : ''), captchaToken } })).then(({ error }) => {
       if (!error) return mostraCodice();
       const m = String(error.message || '');
       if (Antirobot.errore(error)) return torna('Il controllo anti-robot non è riuscito: ricarica la pagina e riprova.');
@@ -262,20 +262,25 @@ const PF = (() => {
       collegamento().auth.verifyOtp({ email: emailAccesso, token: codice, type: 'email' }).then(({ error }) => {
         if (error) return mostraCodice(/expired|invalid/i.test(error.message)
           ? L('Codice sbagliato o scaduto. Ricontrolla, o chiedine uno nuovo.') : 'Non riesco a controllare il codice: riprova tra poco.');
-        // dopo il codice la password si sceglie sempre: chi avesse registrato prima
-        // questa e-mail con una password sua (account non confermato) la perde
-        mostraPassword(() => carica(), false);
+        // dopo il codice si sceglie la password. Se l'account ne ha già una scelta
+        // da lui (3/11/2026), lo diciamo e si può tenere quella: lo diciamo solo
+        // adesso, dopo il codice, così nessuno può provare quali e-mail sono iscritte
+        collegamento().auth.getUser().then(({ data }) => {
+          const gia = !!(data && data.user && data.user.user_metadata && data.user.user_metadata.password_scelta);
+          mostraPassword(() => carica(), gia, null, gia);
+        }, () => mostraPassword(() => carica(), false));
       });
     });
   }
   /* Scegliere (o cambiare) la password. Il campo nascosto con l'e-mail serve
      al telefono per salvarla insieme (Portachiavi, Google). */
-  function mostraPassword(dopo, puoSaltare, msg) {
-    fermaOrologio(); ridisegnaAccesso = () => mostraPassword(dopo, puoSaltare);
+  function mostraPassword(dopo, puoSaltare, msg, giaAccount) {
+    fermaOrologio(); ridisegnaAccesso = () => mostraPassword(dopo, puoSaltare, null, giaAccount);
     app().className = '';
     app().innerHTML = `<div class="accesso">
       <img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
       <h1>${L('Scegli la tua password')}</h1>
+      ${giaAccount ? `<div class="avviso" role="status">${esc(L('Questa e-mail ha già un account con una password. Se te la ricordi, tocca «Tengo la password di prima» ed entri; se no, scegline una nuova.'))}</div>` : ''}
       <p class="sotto">${L('La prossima volta entri con l’e-mail e questa password. Almeno 8 caratteri: meglio tre parole facili da ricordare.')}</p>
       <form id="f-pw" class="campo" novalidate>
         <input type="email" name="email" autocomplete="username" value="${esc(emailAccesso)}" hidden>
@@ -287,7 +292,7 @@ const PF = (() => {
         <button class="btn pieno" style="margin-top:8px">${L('Salva ed entra')}</button>
       </form>
       ${msg ? `<p class="errore" role="alert">${esc(msg)}</p>` : ''}
-      ${puoSaltare ? '<p class="sotto"><a href="#" id="salta">Tengo la password di prima</a></p>' : ''}
+      ${puoSaltare ? `<button class="btn sec pieno" id="salta" type="button">${L('Tengo la password di prima')}</button>` : ''}
     </div>`;
     occhio();
     const n = document.getElementById('nuova'); n.focus();
@@ -296,7 +301,7 @@ const PF = (() => {
     document.getElementById('f-pw').addEventListener('submit', ev => {
       ev.preventDefault();
       const pw = n.value;
-      if (pw.length < 8) return mostraPassword(dopo, puoSaltare, L('La password deve avere almeno 8 caratteri.'));
+      if (pw.length < 8) return mostraPassword(dopo, puoSaltare, L('La password deve avere almeno 8 caratteri.'), giaAccount);
       const b = ev.currentTarget.querySelector('.btn'); b.disabled = true; b.textContent = L('Salvo…');
       collegamento().auth.updateUser({ password: pw, data: { password_scelta: true } }).then(({ error }) => {
         if (!error || error.code === 'same_password') { toast(L('Password salvata.')); return dopo(); }
