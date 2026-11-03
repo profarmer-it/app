@@ -419,9 +419,16 @@ const PF = (() => {
       emailAccesso = r.email || emailAccesso;
       const q = r.richiesta;
       if (r.persona) return schermo('Accesso sospeso', `<p class="sotto">${esc(msg || 'Presenze e turni non è attiva per la tua azienda in questo momento. Scrivi a info@profarmer.it.')}</p>`);
-      if (q && q.stato === 'in_attesa') return schermo('Richiesta inviata', `<p class="sotto">Il ${dataIt(Conti.roma(q.creata).giorno)} hai chiesto Easy per <b>${esc(q.ragione)}</b>.
+      if (q && q.stato === 'in_attesa') {
+        // «Ho ricevuto l'e-mail: entra» premuto prima dell'abilitazione: lo si dice (3/11/2026)
+        if (richiesta.vista === q.id) toast('La richiesta è ancora in attesa: quando Pro Farmer la abilita ti arriva un’e-mail.');
+        richiesta.vista = q.id;
+        return schermo('Richiesta inviata', `<p class="sotto">Il ${dataIt(Conti.roma(q.creata).giorno)} hai chiesto Easy per <b>${esc(q.ragione)}</b>.
         Pro Farmer controlla che sia cliente piùLact e ti abilita: ti arriva un'e-mail. Di solito entro un giorno lavorativo.</p>
         <button class="btn pieno" data-az="ricarica">Ho ricevuto l'e-mail: entra</button>`);
+      }
+      // dopo un rifiuto il modulo riparte con la ragione sociale di prima
+      if (q && q.stato === 'rifiutata' && !formRichiesta.valori) formRichiesta.valori = { ragione: q.ragione };
       formRichiesta(q && q.stato === 'rifiutata' ? q : null, msg);
     }).catch(e => schermo('Non riesco a caricare', `<p class="sotto">${esc(motivo(e))}</p><button class="btn pieno" data-az="ricarica">Riprova</button>`));
   }
