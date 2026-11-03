@@ -2,12 +2,14 @@
 
 **Easy**, l'app di Pro Farmer per le presenze e i turni dei dipendenti delle
 aziende agricole, su **easy.profarmer.it** (dal novembre 2026): timbrature dal
-proprio telefono (con la posizione del momento o col QR appeso in azienda) e il
-contatore «Al lavoro da», ferie e riposi, la settimana a griglia (turni per
-stalla, Festa, lavori del giorno, avvisi su riposi e ore), il cruscotto del mese
-per il titolare (ore, netto con la paga oraria, riposi), il riepilogo per il
-consulente del lavoro, mansionario. Il tablet di stalla col PIN è stato tolto il
-31/10/2026.
+proprio telefono (con la posizione del momento) e il contatore «Al lavoro da»,
+ferie e riposi, la settimana a griglia (turni per stalla, Festa, lavori del
+giorno, avvisi su riposi e ore; sul telefono un giorno alla volta), la home del
+titolare con «Da fare adesso», il cruscotto del mese (ore, netto con la paga
+oraria, riposi), il riepilogo per il consulente del lavoro, mansionario. Le
+schermate del dipendente e dell'accesso sono in 9 lingue (`assets/lingue.js`):
+la lingua viene dalla nazionalità segnata dal titolare o la sceglie il
+dipendente. Tolti il tablet di stalla col PIN (31/10/2026) e i QR (2/11/2026).
 
 Chiunque crea l'account; Pro Farmer abilita le aziende clienti piùLact (gratis,
 senza limiti di dipendenti). I dipendenti entrano con l'e-mail e la password, su
