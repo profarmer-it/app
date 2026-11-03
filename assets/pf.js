@@ -63,6 +63,7 @@ const PF = (() => {
   const bdi = t => `<bdi dir="ltr">${t}</bdi>`;     // orari e durate restano da sinistra anche in arabo e urdu
   const ora = iso => Conti.roma(iso).ora;
   const titolare = () => A && A.io.ruolo === 'titolare';
+  const amministratore = () => !!(A && A.io.amministratore);   // l'amministratore di Easy (51-amministratore-easy.sql)
   const persona = id => A.persone.find(p => p.id === id);
   function nuovaChiave() {
     if (crypto.randomUUID) return crypto.randomUUID();
@@ -521,6 +522,7 @@ const PF = (() => {
     const h = location.hash.replace('#', '').split('=')[0];
     const ok = voci().map(v => v[0]);
     if (h === 'presenze') return titolare() ? 'oggi' : 'timbra';
+    if (h === 'aziende' && amministratore()) return 'aziende';
     return ok.includes(h) ? h : ok[0];
   }
   function barraDemo() {
@@ -536,9 +538,9 @@ const PF = (() => {
     if (!A) return;
     fermaOrologio();
     const v = vistaDaHash();
-    const da = { home: vHome, oggi: vOggi, turni: vTurni, ferie: vFerie, mese: vMese, altro: vAltro, timbra: vTimbra, compiti: vCompiti, profilo: vProfilo }[v];
+    const da = { aziende: vAziende, home: vHome, oggi: vOggi, turni: vTurni, ferie: vFerie, mese: vMese, altro: vAltro, timbra: vTimbra, compiti: vCompiti, profilo: vProfilo }[v];
     const daDecidere = titolare() ? A.assenze.filter(a => a.stato === 'chiesta').length : 0;
-    const titolo = { home: '', oggi: 'Oggi', turni: L('Turni'), ferie: L('Ferie e riposi'), mese: 'Cruscotto del mese', altro: 'Impostazioni',
+    const titolo = { home: '', oggi: 'Oggi', turni: L('Turni'), ferie: L('Ferie e riposi'), mese: 'Cruscotto del mese', altro: 'Impostazioni', aziende: 'Aziende di Easy',
       timbra: '', compiti: L('Compiti'), profilo: L('Profilo') }[v];
     app().className = v === 'mese' || (v === 'turni' && titolare() && (A.tipi || []).length) ? 'largo' : '';
     if (!A.attiva) {
@@ -591,6 +593,7 @@ const PF = (() => {
     const cose = [
       ...oltre.map(x => `<a class="riga cosa" href="#oggi"><span><b>${esc(x.p.nome)}</b> è oltre l’orario</span><span class="chip arancio">${Conti.durataTesto(x.o.minuti)}</span></a>`),
       ...mancano.map(x => `<a class="riga cosa" href="#oggi"><span><b>${esc(x.p.nome)}</b> non ha timbrato</span><span class="chip rosso">turno dalle ${String(x.u.inizio).slice(0, 5)}</span></a>`),
+      amministratore() && Number(A.io.richieste_easy) ? `<a class="riga cosa" href="#aziende"><span><b>${Number(A.io.richieste_easy) === 1 ? 'Una richiesta' : A.io.richieste_easy + ' richieste'}</b> di attivazione di Easy da decidere</span><span class="chip nero">Apri</span></a>` : '',
       chieste ? `<a class="riga cosa" href="#ferie"><span><b>${chieste === 1 ? 'Una richiesta' : chieste + ' richieste'}</b> di ferie o riposo da decidere</span><span class="chip nero">Apri</span></a>` : ''
     ].filter(Boolean);
     return `<div><p class="saluto">${saluto()}, ${esc(A.io.nome)}</p><p class="sotto">${esc(A.azienda.ragione)} · ${dataLunga(oggi)}</p></div>
@@ -1158,9 +1161,148 @@ const PF = (() => {
   }
 
   /* ---------------------------------------------------- altro (titolare) */
+  /* ------------------------------------------- l'amministrazione di Easy
+     Dal 3/11/2026 dentro Easy, per l'amministratore (l'account Pieve
+     Ecoenergia), non più in Riposa Pro: le richieste di chi ha creato
+     l'account (abilita, collegando il cliente piùLact, o rifiuta col motivo),
+     le aziende con il piano, l'attivazione a mano. Si vedono aziende, piani,
+     persone e ultimo uso, mai le presenze dei dipendenti. */
+  const PIANI = { regalo: 'Regalo piùLact', abbonamento: 'Abbonamento', prova: 'Prova 60 giorni' };
+  const STATI_APP = { attivo: 'Attiva', sospeso: 'Sospesa', chiuso: 'Chiusa' };
+  let amm = null;   // { richieste, aziende, clienti }
+  function vAziende() {
+    setTimeout(() => caricaAziende().then(() => { const el = document.getElementById('aziende-dati'); if (el) el.innerHTML = disegnaAziende(); })
+      .catch(e => { const el = document.getElementById('aziende-dati'); if (el) el.innerHTML = `<p class="errore">${esc(motivo(e))}</p>`; }), 0);
+    return `<p class="sotto"><a href="#altro">‹ Impostazioni</a></p>
+      <button class="btn" data-az="attiva-azienda">+ Attiva Easy per un’azienda</button>
+      <div id="aziende-dati">${amm ? disegnaAziende() : '<p class="lista-vuota">Carico le aziende…</p>'}</div>`;
+  }
+  function caricaAziende() {
+    return Promise.all([rpc('pf_richieste_gestione'), rpc('pf_gestione'), rpc('pf_clienti_piulact')])
+      .then(([richieste, aziende, clienti]) => { amm = { richieste: richieste || [], aziende: aziende || [], clienti: clienti || [] }; });
+  }
+  const sceltaCliente = (id, nome, vuoto) => `<select id="${id}" name="${nome}"><option value="">${vuoto}</option>${amm.clienti.map(c =>
+    `<option value="${c.id}">${esc(c.ragione)}${c.comune ? ' · ' + esc(c.comune) : ''}</option>`).join('')}</select>`;
+  function disegnaAziende() {
+    const attesa = amm.richieste.filter(r => r.stato === 'in_attesa'), decise = amm.richieste.filter(r => r.stato !== 'in_attesa');
+    const richiesta = r => {
+      const c = r.cliente;
+      return `<div class="scheda" style="display:flex;flex-direction:column;gap:8px">
+        <div class="riga" style="border:0;padding:0"><b>${esc(r.ragione)}</b><span class="chip giallo">da decidere</span></div>
+        <p class="sotto">${esc(r.nome)} ${esc(r.cognome || '')} · <a href="mailto:${esc(r.email)}">${esc(r.email)}</a>${r.telefono ? ` · <a href="tel:${esc(r.telefono)}">${esc(r.telefono)}</a>` : ''}<br>
+          P.IVA ${esc(r.piva)} · ${esc([r.comune, r.provincia].filter(Boolean).join(' '))} · chiesta il ${dataIt(Conti.roma(r.creata).giorno)}</p>
+        ${r.nota ? `<p class="sotto">«${esc(r.nota)}»</p>` : ''}
+        ${c ? `<div class="avviso" style="border-color:var(--verde)">✓ Cliente piùLact: <b>${esc(c.ragione)}</b>${c.comune ? ' · ' + esc(c.comune) : ''}${c.venditore ? ' · segue ' + esc(c.venditore) : ''}${c.ha_app ? ' · <b>ha già Easy</b>' : ''}</div>`
+          : `<div class="avviso">Questa P.IVA non è fra i clienti piùLact. Se lo è, scegli il cliente qui sotto; se no puoi abilitarla lo stesso.</div>
+            <div class="campo"><label for="rc-${r.id}">Cliente piùLact</label>${sceltaCliente('rc-' + r.id, 'cliente', '— Non è fra i clienti —')}</div>`}
+        ${r.azienda_esiste ? '<p class="errore">C’è già un’azienda con questa P.IVA in Easy: rifiuta e fai aggiungere la persona dal suo titolare.</p>' : ''}
+        <div class="campo"><label for="rm-${r.id}">Motivo, se la rifiuti (lo legge chi ha chiesto)</label><input id="rm-${r.id}" placeholder="Per esempio: non risulta cliente piùLact"></div>
+        <p class="errore" id="re-${r.id}"></p>
+        <div class="riga-bottoni"><button class="btn" data-az="abilita" data-id="${r.id}" data-cliente="${c ? c.id : ''}">Abilita e manda l’e-mail</button>
+          <button class="btn sec" data-az="rifiuta" data-id="${r.id}">Rifiuta</button></div></div>`;
+    };
+    const azienda = a => {
+      const b = a.abbonamento || {}, t = (a.titolari || [])[0] || {};
+      return `<div class="scheda" style="display:flex;flex-direction:column;gap:8px">
+        <div class="riga" style="border:0;padding:0"><b>${esc(a.ragione)}</b><span class="chip${b.stato === 'attivo' ? ' verde' : ''}">${esc(PIANI[b.piano] || '—')} · ${esc(STATI_APP[b.stato] || 'senza piano')}</span></div>
+        <p class="sotto">${esc([a.comune, a.provincia].filter(Boolean).join(' '))}${a.cliente_id ? ' · cliente piùLact' : ''} · ${a.persone} ${a.persone === 1 ? 'persona' : 'persone'} · ultimo uso ${a.ultimo_uso ? dataIt(Conti.roma(a.ultimo_uso).giorno) : 'mai'}<br>
+          Titolare: ${esc(t.nome || '—')} · ${esc(t.email || '')} · ${t.invitato ? 'accesso mandato il ' + dataIt(Conti.roma(t.invitato).giorno) : 'accesso da mandare'}
+          · ${a.nomina ? 'nomina accettata il ' + dataIt(Conti.roma(a.nomina.il).giorno) : '<b>nomina da accettare</b>'}</p>
+        ${b.id ? `<details><summary class="sotto">Cambia il piano</summary><form class="campo" data-piano="${b.id}" novalidate style="gap:10px;margin-top:8px">
+          <div class="due"><div class="campo"><label>Piano</label><select name="piano">${Object.entries(PIANI).map(([k, n]) => `<option value="${k}"${b.piano === k ? ' selected' : ''}>${n}</option>`).join('')}</select></div>
+            <div class="campo"><label>Stato</label><select name="stato">${Object.entries(STATI_APP).map(([k, n]) => `<option value="${k}"${b.stato === k ? ' selected' : ''}>${n}</option>`).join('')}</select></div></div>
+          <div class="due"><div class="campo"><label>Fino al (vuoto = senza scadenza)</label><input type="date" name="fino_al" value="${esc(b.fino_al || '')}"></div>
+            <div class="campo"><label>Prezzo al mese (€)</label><input type="number" step="0.01" min="0" name="prezzo_mese" value="${esc(b.prezzo_mese ?? '')}"></div></div>
+          <div class="campo"><label>Nota</label><input name="nota" value="${esc(b.nota || '')}"></div>
+          <p class="errore"></p><button class="btn">Salva il piano</button></form></details>` : ''}
+        ${t.id ? `<button class="btn sec" data-az="invita-titolare" data-id="${t.id}">${t.invitato ? 'Rimanda l’accesso al titolare' : 'Manda l’accesso al titolare'}</button>` : ''}</div>`;
+    };
+    return `<h2 class="sezione">Richieste da decidere${attesa.length ? ` · ${attesa.length}` : ''}</h2>
+      ${attesa.length ? attesa.map(richiesta).join('') : '<div class="scheda"><p class="lista-vuota">Nessuna richiesta da decidere.</p></div>'}
+      <h2 class="sezione">Aziende con Easy · ${amm.aziende.length}</h2>
+      ${amm.aziende.map(azienda).join('') || '<div class="scheda"><p class="lista-vuota">Ancora nessuna.</p></div>'}
+      ${decise.length ? `<h2 class="sezione">Richieste decise (ultimi 60 giorni)</h2><div class="scheda">${decise.slice(0, 15).map(r =>
+        `<div class="riga"><span><b>${esc(r.ragione)}</b><br><span class="sotto">${esc(r.nome)} ${esc(r.cognome || '')} · ${esc(r.email)}${r.motivo ? ' · ' + esc(r.motivo) : ''}</span></span>
+          <span class="chip${r.stato === 'abilitata' ? ' verde' : ' rosso'}">${r.stato === 'abilitata' ? 'abilitata' : 'rifiutata'} il ${dataIt(Conti.roma(r.decisa).giorno)}</span></div>`).join('')}</div>` : ''}
+      <p class="sotto">Qui si vedono le aziende e i piani, mai le presenze dei dipendenti.</p>`;
+  }
+  function invitaTitolare(id) {
+    return collegamento().functions.invoke('pf-invita', { body: { id } }).then(({ data, error }) => !error && !!(data && data.ok)).catch(() => false);
+  }
+  const ricaricaAziende = msg => caricaAziende().then(() => rpc('pf_area')).then(r => { if (r && r.ok) A.io.richieste_easy = r.io.richieste_easy; disegna(); if (msg) toast(msg); })
+    .catch(e => toast(motivo(e)));
+  function abilita(b) {
+    const id = b.dataset.id, sel = document.getElementById('rc-' + id), err = document.getElementById('re-' + id);
+    const cliente = b.dataset.cliente || (sel && sel.value) || null;
+    if (!cliente && !confirm('Non l’hai collegata a un cliente piùLact. La abiliti lo stesso?')) return;
+    b.disabled = true; b.textContent = 'Abilito…';
+    rpc('pf_abilita_richiesta', { p_id: id, p_cliente: cliente })
+      .then(d => invitaTitolare(d.titolare).then(ok => ricaricaAziende(ok ? 'Abilitata: e-mail mandata al titolare.' : 'Abilitata. L’e-mail non è partita: usa «Manda l’accesso al titolare».')))
+      .catch(e => { b.disabled = false; b.textContent = 'Abilita e manda l’e-mail'; err.textContent = 'Non abilitata: ' + motivo(e); });
+  }
+  function rifiuta(b) {
+    const id = b.dataset.id, m = document.getElementById('rm-' + id), err = document.getElementById('re-' + id);
+    const testo = m.value.trim();
+    if (testo.length < 3) { m.focus(); err.textContent = 'Scrivi il motivo: lo legge chi ha chiesto.'; return; }
+    b.disabled = true; b.textContent = 'Rifiuto…';
+    rpc('pf_rifiuta_richiesta', { p_id: id, p_motivo: testo })
+      .then(() => collegamento().functions.invoke('pf-invita', { body: { richiesta: id } }).then(({ data }) => data && data.ok, () => false))
+      .then(ok => ricaricaAziende(ok ? 'Rifiutata: e-mail mandata con il motivo.' : 'Rifiutata. L’e-mail non è partita: il motivo lo vede comunque nell’app.'))
+      .catch(e => { b.disabled = false; b.textContent = 'Rifiuta'; err.textContent = 'Non rifiutata: ' + motivo(e); });
+  }
+  function foglioAttiva() {
+    const cl = amm ? amm.clienti : [];
+    foglio('Attiva Easy per un’azienda', `
+      <div class="campo"><label for="na-cliente">Cliente piùLact</label><select id="na-cliente"><option value="">— Azienda nuova, non cliente —</option>${cl.map(c =>
+        `<option value="${c.id}">${esc(c.ragione)}${c.comune ? ' · ' + esc(c.comune) : ''}</option>`).join('')}</select></div>
+      <div class="campo"><label for="na-piano">Piano</label><select id="na-piano">${Object.entries(PIANI).map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></div>
+      <div class="campo"><label for="na-email">E-mail del titolare</label><input id="na-email" type="email" inputmode="email" autocapitalize="off"></div>
+      <div class="due"><div class="campo"><label for="na-nome">Nome</label><input id="na-nome"></div><div class="campo"><label for="na-cognome">Cognome</label><input id="na-cognome"></div></div>
+      <div id="na-nuova" class="campo" style="gap:10px">
+        <div class="campo"><label for="na-ragione">Ragione sociale</label><input id="na-ragione"></div>
+        <div class="due"><div class="campo"><label for="na-piva">P.IVA</label><input id="na-piva" inputmode="numeric"></div>
+          <div class="campo"><label for="na-prov">Provincia (sigla)</label><input id="na-prov" maxlength="2" autocapitalize="characters"></div></div>
+        <div class="campo"><label for="na-comune">Comune</label><input id="na-comune"></div></div>
+      <div class="due"><div class="campo"><label for="na-prezzo">Prezzo al mese (€)</label><input id="na-prezzo" type="number" step="0.01" min="0"></div>
+        <div class="campo"><label for="na-fino">Fino al (facoltativo)</label><input id="na-fino" type="date"></div></div>
+      <div class="campo"><label for="na-nota">Nota</label><input id="na-nota"></div>
+      <label class="spunta"><input type="checkbox" id="na-invita" checked> <span>Manda subito al titolare l’e-mail con l’accesso</span></label>
+      <p class="errore" id="na-err"></p><button class="btn pieno" id="na-salva">Attiva</button>`, f => {
+      const q = id => f.querySelector('#' + id);
+      const campi = () => { q('na-nuova').hidden = !!q('na-cliente').value; if (q('na-cliente').value) q('na-piano').value = 'regalo'; else if (q('na-piano').value === 'regalo') q('na-piano').value = 'prova'; };
+      q('na-cliente').addEventListener('change', campi); campi();
+      q('na-salva').addEventListener('click', ev => {
+        const d = { cliente_id: q('na-cliente').value, piano: q('na-piano').value, email: q('na-email').value.trim(), nome: q('na-nome').value.trim(), cognome: q('na-cognome').value.trim(),
+          ragione: q('na-ragione').value.trim(), piva: q('na-piva').value.trim(), comune: q('na-comune').value.trim(), provincia: q('na-prov').value.trim(),
+          prezzo_mese: q('na-prezzo').value, fino_al: q('na-fino').value, nota: q('na-nota').value.trim() };
+        const err = t => { q('na-err').textContent = t; };
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email)) return err('Serve l’e-mail del titolare.');
+        if (!d.cliente_id && d.piano === 'regalo') return err('Il regalo è per i clienti piùLact: scegli il cliente, o un altro piano.');
+        if (!d.cliente_id && d.ragione.length < 2) return err('Scrivi la ragione sociale dell’azienda.');
+        const b = ev.currentTarget; b.disabled = true; b.textContent = 'Attivo…';
+        rpc('pf_attiva', { p: d })
+          .then(r => q('na-invita').checked ? invitaTitolare(r.titolare).then(ok => ok ? 'Easy attivata, accesso mandato al titolare.' : 'Easy attivata. L’e-mail non è partita: usa «Manda l’accesso al titolare».') : 'Easy attivata.')
+          .then(m => { chiudiFoglio(); ricaricaAziende(m); })
+          .catch(e => { b.disabled = false; b.textContent = 'Attiva'; err('Non attivata: ' + motivo(e)); });
+      });
+    });
+  }
+  document.addEventListener('submit', ev => {
+    const f = ev.target.closest('form[data-piano]'); if (!f) return;
+    ev.preventDefault();
+    const d = Object.fromEntries(new FormData(f)), b = f.querySelector('.btn'), err = f.querySelector('.errore');
+    b.disabled = true; b.textContent = 'Salvo…';
+    rpc('pf_cambia_abbonamento', { p: { id: f.dataset.piano, ...d } }).then(() => ricaricaAziende('Piano salvato.'))
+      .catch(e => { b.disabled = false; b.textContent = 'Salva il piano'; err.textContent = 'Non salvato: ' + motivo(e); });
+  });
+
   function vAltro() {
     const persone = A.persone;
-    return `<h2 class="sezione">Persone</h2>
+    const nr = Number(A.io.richieste_easy || 0);
+    return `${amministratore() ? `<h2 class="sezione">Amministrazione di Easy</h2>
+      <a class="scheda riga cosa" href="#aziende" style="border:0"><span><b>Aziende di Easy</b><br><span class="sotto">Richieste di attivazione, aziende e piani</span></span>
+        <span class="dx">${nr ? `<span class="chip arancio">${nr} da decidere</span>` : '›'}</span></a>` : ''}
+      <h2 class="sezione">Persone</h2>
       <div class="scheda">${persone.map(p => `<button class="persona" style="width:100%;text-align:left" data-az="persona" data-id="${p.id}">
         <span class="avatar">${iniziale(p)}</span><span class="chi"><b>${esc(nome(p))}${p.attivo === false ? ' · non più attivo' : ''}</b>
         <span>${p.ruolo === 'titolare' ? 'Titolare' : 'Dipendente'} · ${p.ore_giorno} ore al giorno${p.email ? (p.invitato ? ' · accesso mandato' : ' · accesso da mandare') : ' · senza e-mail'}</span></span></button>`).join('')}
@@ -1598,7 +1740,11 @@ const PF = (() => {
     regole: () => foglioRegole(),
     mansione: b => foglioMansione(b.dataset.id ? A.mansioni.find(m => m.id === b.dataset.id) : null),
     tema: b => { applicaTema(b.dataset.tema); document.querySelectorAll('[data-az="tema"]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); },
-    'timbra-io': b => timbraIo(b.dataset.verso)
+    'timbra-io': b => timbraIo(b.dataset.verso),
+    abilita: b => abilita(b),
+    rifiuta: b => rifiuta(b),
+    'attiva-azienda': () => (amm ? Promise.resolve() : caricaAziende()).then(foglioAttiva).catch(e => toast(motivo(e))),
+    'invita-titolare': b => { b.disabled = true; b.textContent = 'Mando…'; invitaTitolare(b.dataset.id).then(ok => ok ? ricaricaAziende('Accesso mandato al titolare.') : (b.disabled = false, b.textContent = 'Riprova', toast('E-mail non partita: riprova.'))); }
   };
   document.addEventListener('click', ev => {
     const b = ev.target.closest('[data-az]');
