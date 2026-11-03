@@ -12,15 +12,15 @@
 
 const Lingue = (() => {
   const ELENCO = [
-    { id: 'it', nome: 'Italiano', locale: 'it-IT' },
-    { id: 'en', nome: 'English', locale: 'en-GB' },
-    { id: 'pa', nome: 'ਪੰਜਾਬੀ (Punjabi)', locale: 'pa-IN' },
-    { id: 'hi', nome: 'हिन्दी (Hindi)', locale: 'hi-IN' },
-    { id: 'ur', nome: 'اردو (Urdu)', locale: 'ur-PK', rtl: true },
-    { id: 'bn', nome: 'বাংলা (Bengali)', locale: 'bn-BD' },
-    { id: 'ar', nome: 'العربية (Arabo)', locale: 'ar-EG', rtl: true },
-    { id: 'ro', nome: 'Română', locale: 'ro-RO' },
-    { id: 'fr', nome: 'Français', locale: 'fr-FR' }
+    { id: 'it', nome: '🇮🇹 Italiano', locale: 'it-IT' },
+    { id: 'en', nome: '🇬🇧 English', locale: 'en-GB' },
+    { id: 'pa', nome: '🇮🇳 ਪੰਜਾਬੀ (Punjabi)', locale: 'pa-IN' },
+    { id: 'hi', nome: '🇮🇳 हिन्दी (Hindi)', locale: 'hi-IN' },
+    { id: 'ur', nome: '🇵🇰 اردو (Urdu)', locale: 'ur-PK', rtl: true },
+    { id: 'bn', nome: '🇧🇩 বাংলা (Bengali)', locale: 'bn-BD' },
+    { id: 'ar', nome: '🇪🇬 العربية (Arabo)', locale: 'ar-EG', rtl: true },
+    { id: 'ro', nome: '🇷🇴 Română', locale: 'ro-RO' },
+    { id: 'fr', nome: '🇫🇷 Français', locale: 'fr-FR' }
   ];
   // nazionalità → lingua proposta (il titolare o il dipendente la possono cambiare)
   const NAZIONI = [
