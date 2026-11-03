@@ -40,7 +40,7 @@ const PF = (() => {
   const app = () => document.getElementById('app');
   /* La lingua (3/11/2026): prima dell'accesso quella scelta sul telefono o del
      telefono; dopo, quella della persona. Il titolare usa l'italiano. */
-  let LINGUA = 'it';
+  let LINGUA = 'it', linguaScelta = false, ridisegnaAccesso = () => mostraAccesso();
   const L = (s, v) => Lingue.t(LINGUA, s, v);
   function impostaLingua(l, ricorda) {
     LINGUA = Lingue.info(l).id;
@@ -110,7 +110,7 @@ const PF = (() => {
      Il codice di 6 cifre per e-mail resta per il primo accesso e per la
      password dimenticata: dopo il codice si sceglie la password. */
   function mostraAccesso(msg, info) {
-    fermaOrologio();
+    fermaOrologio(); ridisegnaAccesso = () => mostraAccesso();
     app().className = '';
     app().innerHTML = `<div class="accesso">
       <div class="testa-accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">${sceltaLingua('lingua-accesso')}</div>
@@ -169,10 +169,10 @@ const PF = (() => {
   // Primo accesso (o password dimenticata): e-mail, codice, password. Ci porta
   // anche il link dell'e-mail d'invito (#primo-accesso), dal 31/10/2026.
   function mostraPrimo(msg) {
-    fermaOrologio();
+    fermaOrologio(); ridisegnaAccesso = () => mostraPrimo();
     app().className = '';
     app().innerHTML = `<div class="accesso">
-      <img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
+      <div class="testa-accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">${sceltaLingua('lingua-accesso')}</div>
       <h1>${L('Primo accesso')}</h1>
       <p class="sotto">${L('Si fa una volta sola, in tre passi. Vale anche se hai dimenticato la password.')}</p>
       <ol class="passi">
@@ -239,8 +239,9 @@ const PF = (() => {
     });
   }
   function mostraCodice(msg) {
+    ridisegnaAccesso = () => mostraCodice();
     app().innerHTML = `<div class="accesso">
-      <img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
+      <div class="testa-accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">${sceltaLingua('lingua-accesso')}</div>
       <h1>${L('Controlla la posta')}</h1>
       <p class="sotto">${L('Ti abbiamo mandato un codice di 6 cifre a {email}. Vale 15 minuti. Se non lo trovi, guarda nella posta indesiderata.', { email: `<b>${esc(emailAccesso)}</b>` })}</p>
       <form id="f-codice" class="campo" novalidate>
@@ -270,7 +271,7 @@ const PF = (() => {
   /* Scegliere (o cambiare) la password. Il campo nascosto con l'e-mail serve
      al telefono per salvarla insieme (Portachiavi, Google). */
   function mostraPassword(dopo, puoSaltare, msg) {
-    fermaOrologio();
+    fermaOrologio(); ridisegnaAccesso = () => mostraPassword(dopo, puoSaltare);
     app().className = '';
     app().innerHTML = `<div class="accesso">
       <img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
@@ -278,7 +279,9 @@ const PF = (() => {
       <p class="sotto">${L('La prossima volta entri con l’e-mail e questa password. Almeno 8 caratteri: meglio tre parole facili da ricordare.')}</p>
       <form id="f-pw" class="campo" novalidate>
         <input type="email" name="email" autocomplete="username" value="${esc(emailAccesso)}" hidden>
-        <label for="nuova">${L('La nuova password')}</label>
+        <label for="lingua-accesso">${L('In che lingua vuoi usare l’app?')}</label>
+        ${sceltaLingua('lingua-accesso')}
+        <label for="nuova" style="margin-top:8px">${L('La nuova password')}</label>
         <div class="campo-pw"><input id="nuova" name="new-password" type="password" autocomplete="new-password" minlength="8" enterkeyhint="done">
           <button type="button" class="mostra-pw" aria-label="${L('Mostra')}" aria-pressed="false">${L('Mostra')}</button></div>
         <button class="btn pieno" style="margin-top:8px">${L('Salva ed entra')}</button>
@@ -382,6 +385,10 @@ const PF = (() => {
       }
       A = r;
       // il titolare vede l'app in italiano; il dipendente nella sua lingua
+      if (linguaScelta && A.io.ruolo !== 'titolare' && LINGUA !== A.io.lingua) {
+        A.io.lingua = LINGUA; rpc('pf_salva_lingua', { p_lingua: LINGUA }).catch(() => {});
+      }
+      linguaScelta = false;
       impostaLingua(A.io.ruolo === 'titolare' ? 'it' : (A.io.lingua || leggi('pf-lingua', null) || 'it'), A.io.ruolo !== 'titolare');
       if (A.persone && !A.persone.find(p => p.id === A.io.id)) A.persone.push(A.io);
       svuotaCoda();
@@ -1509,7 +1516,12 @@ const PF = (() => {
   });
   document.addEventListener('change', ev => {
     if (ev.target.id === 'lingua-profilo') return cambiaLingua(ev.target.value);
-    if (ev.target.id === 'lingua-accesso') { impostaLingua(ev.target.value, true); const el = document.getElementById('email'); if (el) emailAccesso = el.value.trim(); return mostraAccesso(); }
+    if (ev.target.id === 'lingua-accesso') {
+      impostaLingua(ev.target.value, true); linguaScelta = true;
+      if (A && A.io && A.io.ruolo !== 'titolare') { A.io.lingua = LINGUA; rpc('pf_salva_lingua', { p_lingua: LINGUA }).catch(() => {}); }
+      const el = document.getElementById('email') || document.getElementById('p-email'); if (el && el.value.trim()) emailAccesso = el.value.trim();
+      return ridisegnaAccesso();
+    }
     if (ev.target.id !== 'demo-chi') return;
     const v = ev.target.value;
     PFDemo.diventa(v); location.hash = ''; carica();
