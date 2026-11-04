@@ -104,7 +104,7 @@ const PF = (() => {
     });
   }
   const motivo = e => e && e.delDatabase ? e.message
-    : navigator.onLine === false ? 'Sei senza rete: riprova quando torna il segnale.' : 'Qualcosa non è andato: riprova tra poco.';
+    : navigator.onLine === false ? L('Sei senza rete: riprova quando torna il segnale.') : L('Qualcosa non è andato: riprova tra poco.');
 
   /* -------------------------------------------------------------- l'accesso
      Dal 30/10/2026 si entra con e-mail e password, e il telefono la ricorda.
@@ -498,7 +498,7 @@ const PF = (() => {
       if (dopo) dopo(); else disegna();
     }).catch(e => {
       // senza rete: se l'area c'era già, si continua con quella
-      if (A) { toast('Senza rete: vedi i dati di prima.'); disegna(); return; }
+      if (A) { toast(L('Senza rete: vedi i dati di prima.')); disegna(); return; }
       app().innerHTML = `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
         <h1>Non riesco a caricare</h1><p class="sotto">${esc(motivo(e))}</p>
         <button class="btn pieno" id="riprova">Riprova</button></div>`;
@@ -552,9 +552,8 @@ const PF = (() => {
     app().className = v === 'mese' || (v === 'turni' && titolare() && (A.tipi || []).length) ? 'largo' : '';
     if (!A.attiva) {
       app().innerHTML = barraDemo() + `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
-        <h1>Presenze e turni è in pausa</h1><p class="sotto">Per la tua azienda l'app non è attiva in questo momento.
-        Scrivi a <a href="mailto:info@profarmer.it">info@profarmer.it</a> o chiama Pro Farmer.</p>
-        <button class="btn sec" data-az="esci">Esci</button></div>`;
+        <h1>${L('Easy è in pausa')}</h1><p class="sotto">${L('Per la tua azienda l’app non è attiva in questo momento. Chiedi al titolare.')}</p>
+        <button class="btn sec" data-az="esci">${L('Esci')}</button></div>`;
       return;
     }
     if (!A.azienda.nomina) { vNomina(); return; }
@@ -1467,8 +1466,8 @@ const PF = (() => {
     app().className = '';
     if (!titolare()) {
       app().innerHTML = barraDemo() + `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
-        <h1>Quasi pronta</h1><p class="sotto">Il titolare di ${esc(A.azienda.ragione)} deve ancora completare l'attivazione di Presenze e turni.
-        Appena l'ha fatto, riapri l'app.</p><button class="btn sec" data-az="esci">Esci</button></div>`;
+        <h1>${L('Quasi pronta')}</h1><p class="sotto">${L('Il titolare di {azienda} deve ancora completare l’attivazione di Easy. Appena l’ha fatto, riapri l’app.', { azienda: esc(A.azienda.ragione) })}</p>
+        <button class="btn sec" data-az="esci">${L('Esci')}</button></div>`;
       return;
     }
     app().innerHTML = barraDemo() + `<header class="testa"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer"></header>
@@ -1547,8 +1546,8 @@ const PF = (() => {
     if (DEMO) return toast('Nella demo le notifiche non partono.');
     const suIPhone = /iphone|ipad|ipod/i.test(navigator.userAgent);
     const installata = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-    if (suIPhone && !installata) return toast('Su iPhone: prima Condividi → «Aggiungi alla schermata Home», poi apri l’app da lì.');
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return toast('Questo telefono non riceve notifiche dall’app.');
+    if (suIPhone && !installata) return toast(L('Su iPhone gli avvisi arrivano solo con l’app sulla schermata Home: in Safari tocca Condividi → Aggiungi alla schermata Home, poi apri Easy da lì.'));
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return toast(L('questo telefono non li riceve'));
     Notification.requestPermission().then(perm => {
       if (perm !== 'granted') { riempiAvvisi(); return toast(L('Avvisi non permessi: si cambiano nelle impostazioni del telefono.')); }
       return navigator.serviceWorker.ready
