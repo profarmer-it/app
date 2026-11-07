@@ -662,7 +662,7 @@ const PF = (() => {
       <p class="sotto">Tocca una timbratura per correggerla. La riga di prima resta nello storico, con il motivo.</p>`;
   }
   const MODI = { qr: 'QR', chiosco: 'tablet', titolare: 'dal titolare', correzione: 'corretta', telefono: 'suo telefono' };
-  const AREE = { fuori: ' · <b style="color:var(--rosso)">fuori area</b>', nd: ' · posizione non data' };
+  const AREE = { fuori: ' · <b style="color:var(--rosso)">fuori area</b>', imprecisa: ' · posizione imprecisa', nd: ' · posizione non data' };
   function oltreRiga(t, p) {
     if (t.verso !== 'uscita' || t.valida === false || !p) return '';
     const o = Conti.oltre(A.timbrature, p, A.turni, t);
@@ -1394,6 +1394,8 @@ const PF = (() => {
         <p class="sotto">L’area dell’azienda: ${z.area ? `segnata, raggio ${z.raggio_m} m.` : '<b>non ancora segnata</b>.'} Mettiti in azienda (per esempio in sala mungitura) e premi il pulsante.
           Il telefono di chi timbra dice solo se è dentro o fuori, e solo in quel momento.</p>
         <button class="btn sec" id="r-qui" type="button">Segna qui la posizione dell’azienda</button>
+        ${z.area ? `<button class="btn sec" id="r-prova" type="button">Prova la posizione qui</button>
+        <p class="sotto" id="r-prova-esito">Dice come risulterebbe una timbratura fatta adesso da qui. Non salva niente.</p>` : ''}
         <label for="r-raggio">Raggio in metri</label><input id="r-raggio" type="number" inputmode="numeric" min="50" max="3000" value="${z.raggio_m || 300}"></div>
       <button class="btn pieno" id="r-salva">Salva</button>`, f => {
       let lat, lon;
@@ -1403,6 +1405,22 @@ const PF = (() => {
         if (DEMO) { lat = 45.2; lon = 10.0; b.textContent = 'Posizione segnata ✓'; return; }
         navigator.geolocation.getCurrentPosition(q => { lat = q.coords.latitude; lon = q.coords.longitude; b.textContent = `Posizione segnata ✓ (precisione ${Math.round(q.coords.accuracy)} m)`; },
           () => { b.textContent = 'Posizione non trovata: dai il permesso e riprova all’aperto'; }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+      });
+      const prova = f.querySelector('#r-prova');
+      if (prova) prova.addEventListener('click', () => {
+        const out = f.querySelector('#r-prova-esito');
+        prova.disabled = true; prova.textContent = 'Cerco la posizione (8 secondi)…';
+        posizioneOra().then(pos => DEMO ? { esito: 'dentro', metri: 40, precisione: 15, raggio: 300 }
+            : rpc('pf_prova_posizione', { p_lat: pos ? pos.lat : null, p_lon: pos ? pos.lon : null, p_precisione: pos ? pos.precisione : null }))
+          .then(r => {
+            const dove = r.metri != null ? `Sei a ${r.metri} m dal punto segnato (raggio ${r.raggio} m), precisione del telefono ${r.precisione} m. ` : '';
+            out.innerHTML = r.esito === 'nd' ? '<b>Posizione non trovata.</b> Dai il permesso della posizione e riprova.'
+              : dove + `Una timbratura adesso risulterebbe <b>${{ dentro: 'dentro', fuori: 'fuori area', imprecisa: 'con la posizione imprecisa' }[r.esito] || '—'}</b>.`
+                + (r.esito === 'fuori' && r.precisione <= 50 && r.metri > r.raggio ? ' Se sei in azienda, il punto segnato è lontano: premi «Segna qui» da un punto centrale, o allarga il raggio.' : '')
+                + (r.esito === 'imprecisa' ? ' Sotto il tetto il telefono vede male il cielo: riprova vicino a una porta o all’aperto.' : '');
+          })
+          .catch(e => { out.textContent = motivo(e); })
+          .then(() => { prova.disabled = false; prova.textContent = 'Prova di nuovo'; });
       });
       f.querySelector('#r-salva').addEventListener('click', () => salvaE('pf_salva_regole', { p: {
         pausa_minuti: f.querySelector('#r-pmin').value, pausa_dopo_ore: f.querySelector('#r-pdopo').value,
@@ -1430,13 +1448,22 @@ const PF = (() => {
      Il dipendente entra con la sua e-mail e la sua password (lo invita il
      titolare) e preme «Entrata» / «Uscita». Il controllo lo sceglie il titolare:
      la posizione solo in quel momento o niente. */
-  function posizioneOra() {
+  /* La posizione di adesso (dal 7/11/2026 la migliore di qualche secondo): sotto i
+     capannoni la prima lettura è spesso imprecisa di centinaia di metri e il GPS
+     migliora in pochi secondi. Si ascolta al massimo 8 secondi, o finché la
+     precisione scende a 30 m, poi si smette: niente posizione in continuo. */
+  function posizioneOra(secondi = 8) {
     if (DEMO) return Promise.resolve({ lat: 45.2, lon: 10.0, precisione: 15 });
     if (!navigator.geolocation) return Promise.resolve(null);
-    // solo adesso, una volta: niente posizione in continuo
-    return new Promise(ok => navigator.geolocation.getCurrentPosition(
-      p => ok({ lat: p.coords.latitude, lon: p.coords.longitude, precisione: p.coords.accuracy }), () => ok(null),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }));
+    return new Promise(ok => {
+      let meglio = null, finito = false, id = null;
+      const fine = () => { if (finito) return; finito = true; if (id != null) navigator.geolocation.clearWatch(id); ok(meglio); };
+      id = navigator.geolocation.watchPosition(p => {
+        if (!meglio || p.coords.accuracy < meglio.precisione) meglio = { lat: p.coords.latitude, lon: p.coords.longitude, precisione: p.coords.accuracy };
+        if (meglio.precisione <= 30) fine();
+      }, () => fine(), { enableHighAccuracy: true, timeout: secondi * 1000, maximumAge: 0 });
+      setTimeout(fine, secondi * 1000);
+    });
   }
 
   function timbraIo(verso) {
@@ -1447,7 +1474,10 @@ const PF = (() => {
       const args = { p_verso: verso, p_ora_telefono: quando, p_chiave: chiave, p_codice: null,
         p_lat: pos ? pos.lat : null, p_lon: pos ? pos.lon : null, p_precisione: pos ? pos.precisione : null };
       rpc('pf_timbra_io', args).then(r => {
-        const nota = r.area === 'fuori' ? ' ' + L('Risulti fuori dall’area dell’azienda: il titolare lo vede.')
+        const nota = r.area === 'fuori' ? ' ' + (r.metri != null
+            ? L('Risulti a circa {m} m dall’azienda (precisione {p} m): il titolare vede «fuori area».', { m: r.metri, p: r.precisione })
+            : L('Risulti fuori dall’area dell’azienda: il titolare lo vede.'))
+          : r.area === 'imprecisa' ? ' ' + L('Il telefono ha dato una posizione poco precisa ({p} m): la timbratura vale, il titolare vede «posizione imprecisa». La prossima volta attiva la posizione precisa del telefono.', { p: r.precisione })
           : r.area === 'nd' ? ' ' + L('Segnata senza posizione: dai il permesso della posizione all’app.') : '';
         esito(true, r.verso === 'entrata' ? L('Entrata') : L('Uscita'), L(r.gia ? 'Era già segnata alle {ora}.' : 'Alle {ora}.', { ora: ora(r.quando) }) + nota);
         aggiorna();
