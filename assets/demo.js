@@ -106,7 +106,7 @@ const PFDemo = (() => {
     return {
       azienda: { id: AZ, ragione: 'Cascina Demo', comune: 'Soresina', pausa_dopo_ore: 6, pausa_minuti: 0, ritardo_minuti: 15,
         soglia_straordinari_mese: 30, posizione_attiva: true, cliente_piulact: true, verifica: 'posizione', area: true, raggio_m: 300,
-        nomina: { versione: 'nomina-2026-11-v5', il: new Date(Date.now() - 20 * 864e5).toISOString(), da: 'Marco Rossi' } },
+        nomina: { versione: Documenti.VERSIONE, il: new Date(Date.now() - 20 * 864e5).toISOString(), da: 'Marco Rossi' } },
       piano: { piano: 'regalo', stato: 'attivo', fino_al: null },
       persone, turni, mansioni, timbrature, assenze: ass,
       settimane: [Conti.lunediDi(oggi)]
@@ -315,7 +315,7 @@ const PFDemo = (() => {
       else d.mansioni.push({ id: id(), titolo: p.titolo, istruzioni: p.istruzioni || '', persone: p.persone || [] });
       salva(); return { ok: true };
     },
-    pf_accetta_nomina() { titolare(); d.azienda.nomina = { versione: 'nomina-2026-11-v5', il: new Date().toISOString(), da: me().nome }; salva(); return { ok: true }; },
+    pf_accetta_nomina() { titolare(); d.azienda.nomina = { versione: Documenti.VERSIONE, il: new Date().toISOString(), da: me().nome }; salva(); return { ok: true }; },
     // il dipendente timbra dal suo account (30/10/2026): nella demo è sempre in azienda
     pf_timbra_io({ p_verso, p_ora_telefono, p_chiave }) {
       const area = d.azienda.verifica === 'posizione' ? 'dentro' : null;

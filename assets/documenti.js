@@ -14,7 +14,7 @@
    ========================================================================== */
 
 const Documenti = (() => {
-  const VERSIONE = 'nomina-2026-11-v5';   // v5 (31/10): niente più PIN né tablet, in più la paga oraria e i lavori del giorno; v4: Cloudflare Turnstile; v3: il dipendente timbra dal suo account
+  const VERSIONE = 'nomina-2026-11-v6';   // v6 (7/11): la posizione della timbratura in un registro di 30 giorni, consultato solo in casi straordinari, al posto di dentro/fuori; v5 (31/10): niente più PIN né tablet, in più la paga oraria e i lavori del giorno; v4: Cloudflare Turnstile; v3: il dipendente timbra dal suo account
   const CONDIZIONI = 'condizioni-easy-2026-11-v1';
   const PF = 'Pro Farmer S.r.l.s., Via Milazzo 19, 26100 Cremona (CR), P.IVA 01797050190, info@profarmer.it';
   const e = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -49,8 +49,10 @@ e non li usa per finalità proprie, commerciali o di profilazione.</p>
 <h3>3. Interessati e dati</h3>
 <p>Interessati: i dipendenti e i collaboratori che il Titolare inserisce nell’app, e il Titolare stesso.
 Dati: nome e cognome, indirizzo e-mail, orario di contratto, paga oraria netta (inserita dal Titolare per il proprio riepilogo del mese, non visibile ai dipendenti),
-orari di entrata e uscita, assenze e relativo tipo, turni, lavori del giorno, compiti, correzioni con il loro motivo; se il Titolare sceglie il controllo della posizione, l’indicazione «dentro», «fuori» o «senza posizione»
-rispetto all’area dell’azienda al momento della timbratura (le coordinate non vengono conservate).
+orari di entrata e uscita, assenze e relativo tipo, turni, lavori del giorno, compiti, correzioni con il loro motivo; se il Titolare sceglie di usare la posizione,
+la posizione del telefono (coordinate e precisione) letta <b>solo nel momento della timbratura</b>. La posizione è conservata in un registro separato
+per <b>30 giorni</b> dalla timbratura e poi cancellata automaticamente; il Titolare la consulta <b>solo in casi straordinari</b> (per esempio un dubbio
+su una timbratura), indicando ogni volta il motivo, e ogni consultazione resta registrata.
 <b>Non si trattano dati biometrici</b> e non si traccia la posizione in continuo. La malattia è indicata solo come tipo di assenza, senza diagnosi.</p>
 
 <h3>4. Obblighi del Titolare</h3>
@@ -115,7 +117,7 @@ orari di entrata e uscita; assenze e loro tipo (senza diagnosi); turni, lavori d
 <ul>
 <li><b>Niente dati biometrici</b> (impronte, volto).</li>
 <li><b>Niente posizione in continuo.</b> ${az && (az.verifica || 'posizione') === 'posizione'
-  ? 'Quando timbri dal telefono, solo in quel momento il telefono indica se sei dentro o fuori dall’area dell’azienda: si conserva solo questo esito, mai le coordinate. Se non dai il permesso della posizione la timbratura vale lo stesso, segnata «senza posizione».'
+  ? 'Quando timbri dal telefono, solo in quel momento l’app registra la posizione del telefono (coordinate e precisione). Si tiene per 30 giorni in un registro separato e poi si cancella da sola. Il titolare la guarda solo in casi straordinari, per esempio un dubbio su una timbratura, scrivendo ogni volta il motivo: ogni consultazione resta registrata. Se non dai il permesso della posizione la timbratura vale lo stesso, segnata «senza posizione».'
   : 'La posizione del telefono non viene usata.'}</li>
 <li>Timbri dal tuo telefono, entrando nell’app con la tua e-mail e la tua password${az && az.verifica === 'qr' ? ' e inquadrando il QR appeso in azienda' : ''}.
 La password è personale: non darla ai colleghi, non timbrare per loro e non farlo fare a loro per te.</li>
@@ -127,7 +129,7 @@ Pro Farmer e i suoi fornitori tecnici (database in Unione europea, invio e-mail 
 I colleghi vedono solo se sei presente o assente, non il motivo.</p>
 
 <h3>Per quanto tempo</h3>
-<p>Per la durata del rapporto di lavoro e poi per i tempi previsti dalla legge per i documenti di lavoro e di paga.</p>
+<p>Per la durata del rapporto di lavoro e poi per i tempi previsti dalla legge per i documenti di lavoro e di paga. La posizione delle timbrature si cancella dopo 30 giorni.</p>
 
 <h3>I tuoi diritti</h3>
 <p>Puoi chiedere all’azienda di vedere i tuoi dati, correggerli, e negli altri casi previsti cancellarli, limitarne l’uso, opporti o averne copia

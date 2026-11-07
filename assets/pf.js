@@ -694,7 +694,7 @@ const PF = (() => {
         : `<p class="orologio" id="orologio">${Conti.roma(new Date().toISOString()).ora}</p><p class="data">${dataLunga(oggi)}</p>`}
       ${a ? `<div class="avviso">${L('Oggi: {tipo}.', { tipo: tipoT(a.tipo) })}</div>` : ''}
       <button class="btn enorme${dentro ? ' uscita' : ''}" data-az="timbra-io" data-verso="${dentro ? 'uscita' : 'entrata'}">${dentro ? L('Uscita · fine lavoro') : L('Entrata · inizio lavoro')}</button>
-      <p class="sotto" style="text-align:center">${verifica !== 'nessuna' ? L('Quando premi, il telefono dice solo se sei in azienda. Nessun tracciamento.')
+      <p class="sotto" style="text-align:center">${verifica !== 'nessuna' ? L('Quando premi, l’app registra dove sei solo in quel momento. Nessun tracciamento.')
         : ''}</p>
       <div id="avvisi-box"></div>
       ${coda.length ? `<div class="avviso">${L('Timbrature salvate sul telefono: {n}. Partono da sole quando torna la rete.', { n: coda.length })}</div>` : ''}
@@ -1387,46 +1387,16 @@ const PF = (() => {
         <div class="campo"><label for="r-pdopo">…oltre queste ore nel giorno</label><input id="r-pdopo" type="number" inputmode="decimal" min="0" max="16" step="0.5" value="${z.pausa_dopo_ore}"></div></div>
       <div class="campo"><label for="r-rit">Promemoria a chi non ha timbrato, minuti dopo l’inizio del turno</label><input id="r-rit" type="number" inputmode="numeric" min="5" max="240" value="${z.ritardo_minuti}"></div>
       <div class="campo"><label for="r-soglia">Avviso se gli straordinari del mese superano (ore)</label><input id="r-soglia" type="number" inputmode="numeric" min="0" max="200" value="${z.soglia_straordinari_mese}"></div>
-      <div class="campo"><label for="r-ver">Quando si timbra dal telefono, controlla che sia in azienda con</label><select id="r-ver">
-        <option value="posizione"${(z.verifica || 'posizione') === 'posizione' ? ' selected' : ''}>la posizione, solo in quel momento</option>
-        <option value="nessuna"${z.verifica === 'nessuna' ? ' selected' : ''}>nessun controllo</option></select></div>
-      <div id="r-area-c" class="campo"${(z.verifica || 'posizione') === 'posizione' ? '' : ' hidden'}>
-        <p class="sotto">L’area dell’azienda: ${z.area ? `segnata, raggio ${z.raggio_m} m.` : '<b>non ancora segnata</b>.'} Mettiti in azienda (per esempio in sala mungitura) e premi il pulsante.
-          Il telefono di chi timbra dice solo se è dentro o fuori, e solo in quel momento.</p>
-        <button class="btn sec" id="r-qui" type="button">Segna qui la posizione dell’azienda</button>
-        ${z.area ? `<button class="btn sec" id="r-prova" type="button">Prova la posizione qui</button>
-        <p class="sotto" id="r-prova-esito">Dice come risulterebbe una timbratura fatta adesso da qui. Non salva niente.</p>` : ''}
-        <label for="r-raggio">Raggio in metri</label><input id="r-raggio" type="number" inputmode="numeric" min="50" max="3000" value="${z.raggio_m || 300}"></div>
+      <div class="campo"><label for="r-ver">Quando si timbra dal telefono</label><select id="r-ver">
+        <option value="posizione"${(z.verifica || 'posizione') === 'posizione' ? ' selected' : ''}>registra la posizione di quel momento</option>
+        <option value="nessuna"${z.verifica === 'nessuna' ? ' selected' : ''}>non usare la posizione</option></select></div>
+      <p class="sotto">La posizione si legge solo quando si timbra e va in un registro a parte: si cancella dopo 30 giorni. La guardi solo in casi straordinari,
+        dalla timbratura in «Oggi» → «Vedi la posizione», scrivendo il motivo; ogni consultazione resta registrata.</p>
       <button class="btn pieno" id="r-salva">Salva</button>`, f => {
-      let lat, lon;
-      f.querySelector('#r-ver').addEventListener('change', ev => { f.querySelector('#r-area-c').hidden = ev.target.value !== 'posizione'; });
-      f.querySelector('#r-qui').addEventListener('click', ev => {
-        const b = ev.currentTarget; b.textContent = 'Cerco la posizione…';
-        if (DEMO) { lat = 45.2; lon = 10.0; b.textContent = 'Posizione segnata ✓'; return; }
-        navigator.geolocation.getCurrentPosition(q => { lat = q.coords.latitude; lon = q.coords.longitude; b.textContent = `Posizione segnata ✓ (precisione ${Math.round(q.coords.accuracy)} m)`; },
-          () => { b.textContent = 'Posizione non trovata: dai il permesso e riprova all’aperto'; }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
-      });
-      const prova = f.querySelector('#r-prova');
-      if (prova) prova.addEventListener('click', () => {
-        const out = f.querySelector('#r-prova-esito');
-        prova.disabled = true; prova.textContent = 'Cerco la posizione (8 secondi)…';
-        posizioneOra().then(pos => DEMO ? { esito: 'dentro', metri: 40, precisione: 15, raggio: 300 }
-            : rpc('pf_prova_posizione', { p_lat: pos ? pos.lat : null, p_lon: pos ? pos.lon : null, p_precisione: pos ? pos.precisione : null }))
-          .then(r => {
-            const dove = r.metri != null ? `Sei a ${r.metri} m dal punto segnato (raggio ${r.raggio} m), precisione del telefono ${r.precisione} m. ` : '';
-            out.innerHTML = r.esito === 'nd' ? '<b>Posizione non trovata.</b> Dai il permesso della posizione e riprova.'
-              : dove + `Una timbratura adesso risulterebbe <b>${{ dentro: 'dentro', fuori: 'fuori area', imprecisa: 'con la posizione imprecisa' }[r.esito] || '—'}</b>.`
-                + (r.esito === 'fuori' && r.precisione <= 50 && r.metri > r.raggio ? ' Se sei in azienda, il punto segnato è lontano: premi «Segna qui» da un punto centrale, o allarga il raggio.' : '')
-                + (r.esito === 'imprecisa' ? ' Sotto il tetto il telefono vede male il cielo: riprova vicino a una porta o all’aperto.' : '');
-          })
-          .catch(e => { out.textContent = motivo(e); })
-          .then(() => { prova.disabled = false; prova.textContent = 'Prova di nuovo'; });
-      });
       f.querySelector('#r-salva').addEventListener('click', () => salvaE('pf_salva_regole', { p: {
         pausa_minuti: f.querySelector('#r-pmin').value, pausa_dopo_ore: f.querySelector('#r-pdopo').value,
         ritardo_minuti: f.querySelector('#r-rit').value, soglia_straordinari_mese: f.querySelector('#r-soglia').value,
-        verifica: f.querySelector('#r-ver').value, raggio_m: f.querySelector('#r-raggio').value,
-        ...(lat != null ? { lat, lon } : {}) } }, 'Regole salvate.', f));
+        verifica: f.querySelector('#r-ver').value } }, 'Regole salvate.', f));
     });
   }
   function foglioMansione(m) {
@@ -1474,11 +1444,8 @@ const PF = (() => {
       const args = { p_verso: verso, p_ora_telefono: quando, p_chiave: chiave, p_codice: null,
         p_lat: pos ? pos.lat : null, p_lon: pos ? pos.lon : null, p_precisione: pos ? pos.precisione : null };
       rpc('pf_timbra_io', args).then(r => {
-        const nota = r.area === 'fuori' ? ' ' + (r.metri != null
-            ? L('Risulti a circa {m} m dall’azienda (precisione {p} m): il titolare vede «fuori area».', { m: r.metri, p: r.precisione })
-            : L('Risulti fuori dall’area dell’azienda: il titolare lo vede.'))
-          : r.area === 'imprecisa' ? ' ' + L('Il telefono ha dato una posizione poco precisa ({p} m): la timbratura vale, il titolare vede «posizione imprecisa». La prossima volta attiva la posizione precisa del telefono.', { p: r.precisione })
-          : r.area === 'nd' ? ' ' + L('Segnata senza posizione: dai il permesso della posizione all’app.') : '';
+        // dal 7/11/2026 niente dentro / fuori: la posizione va nel registro di 30 giorni (55)
+        const nota = r.area === 'nd' ? ' ' + L('Segnata senza posizione: dai il permesso della posizione all’app.') : '';
         esito(true, r.verso === 'entrata' ? L('Entrata') : L('Uscita'), L(r.gia ? 'Era già segnata alle {ora}.' : 'Alle {ora}.', { ora: ora(r.quando) }) + nota);
         aggiorna();
       }).catch(e => {
@@ -1710,7 +1677,11 @@ const PF = (() => {
       <div class="campo"><label for="c-motivo">Motivo (obbligatorio)</label><input id="c-motivo" maxlength="200"></div>
       <p class="errore" id="c-err"></p>
       <button class="btn pieno" id="c-salva">Correggi</button><button class="btn chiaro" id="c-annulla">Era sbagliata: annullala</button>
-      ${t.verso === 'entrata' ? '<button class="btn sec" id="c-uscita">Aggiungi l’uscita mancante</button>' : ''}`, f => {
+      ${t.verso === 'entrata' ? '<button class="btn sec" id="c-uscita">Aggiungi l’uscita mancante</button>' : ''}
+      ${t.modo === 'telefono' ? `<details class="posizione-straordinaria"><summary class="sotto">Vedi la posizione (solo in casi straordinari)</summary>
+        <p class="sotto">La posizione resta 30 giorni. Scrivi perché la guardi: la consultazione resta registrata.</p>
+        <div class="campo"><label for="c-pmotivo">Motivo</label><input id="c-pmotivo" maxlength="300" placeholder="Per esempio: dubbio sulla timbratura del 7/11"></div>
+        <button class="btn sec" id="c-pos" type="button">Vedi la posizione</button><p class="sotto" id="c-pos-esito"></p></details>` : ''}`, f => {
       const m = () => f.querySelector('#c-motivo').value;
       f.querySelector('#c-salva').addEventListener('click', () => salvaE('pf_correggi', { p_id: t.id,
         p_quando: istante(f.querySelector('#c-giorno').value, f.querySelector('#c-ora').value), p_verso: f.querySelector('#c-verso').value,
@@ -1718,6 +1689,17 @@ const PF = (() => {
       f.querySelector('#c-annulla').addEventListener('click', () => salvaE('pf_correggi', { p_id: t.id, p_quando: null, p_verso: null, p_annulla: true, p_motivo: m() }, 'Annullata.', f));
       const u = f.querySelector('#c-uscita');
       if (u) u.addEventListener('click', () => { chiudiFoglio(); foglioTimbraPerOra(t.persona); const s = document.getElementById('x-verso'); if (s) s.value = 'uscita'; });
+      const vedi = f.querySelector('#c-pos');
+      if (vedi) vedi.addEventListener('click', () => {
+        const out = f.querySelector('#c-pos-esito'), perche = f.querySelector('#c-pmotivo').value.trim();
+        if (perche.length < 5) { out.textContent = 'Scrivi il motivo: la consultazione resta registrata.'; return; }
+        vedi.disabled = true;
+        (DEMO ? Promise.resolve({ trovata: true, lat: 45.2, lon: 10.0, precisione: 15 }) : rpc('pf_posizione_timbratura', { p_id: t.id, p_motivo: perche }))
+          .then(r => {
+            out.innerHTML = !r.trovata ? 'Per questa timbratura la posizione non c’è: è più vecchia di 30 giorni, o il telefono non l’ha data.'
+              : `Precisione del telefono ${r.precisione} m. <a href="https://www.openstreetmap.org/?mlat=${r.lat}&mlon=${r.lon}#map=18/${r.lat}/${r.lon}" target="_blank" rel="noopener">Apri sulla cartina</a>`;
+          }).catch(e => { out.textContent = motivo(e); vedi.disabled = false; });
+      });
     });
   }
 
