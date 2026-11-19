@@ -215,11 +215,21 @@ const Lingue = (() => {
     return s;
   }
   // i giorni e i mesi nella lingua (per il dipendente), con Intl
+  /* Chrome non ha i nomi in punjabi e ripiega sull'inglese («M11 19, Thu»): controllo del 19/11/2026.
+     Se il risultato non è in gurmukhi, si usano questi. */
+  const PA_G = ['ਐਤਵਾਰ', 'ਸੋਮਵਾਰ', 'ਮੰਗਲਵਾਰ', 'ਬੁੱਧਵਾਰ', 'ਵੀਰਵਾਰ', 'ਸ਼ੁੱਕਰਵਾਰ', 'ਸ਼ਨੀਵਾਰ'];
+  const PA_C = ['ਐਤ', 'ਸੋਮ', 'ਮੰਗਲ', 'ਬੁੱਧ', 'ਵੀਰ', 'ਸ਼ੁੱਕਰ', 'ਸ਼ਨੀ'];
+  const PA_M = ['ਜਨਵਰੀ', 'ਫ਼ਰਵਰੀ', 'ਮਾਰਚ', 'ਅਪ੍ਰੈਲ', 'ਮਈ', 'ਜੂਨ', 'ਜੁਲਾਈ', 'ਅਗਸਤ', 'ਸਤੰਬਰ', 'ਅਕਤੂਬਰ', 'ਨਵੰਬਰ', 'ਦਸੰਬਰ'];
+  const senzaPunjabi = (lingua, s) => lingua === 'pa' && !/[\u0A00-\u0A7F]/.test(s);
   function giorno(lingua, g, forma) {
-    return new Intl.DateTimeFormat(info(lingua).locale, { weekday: forma || 'long', timeZone: 'UTC' }).format(new Date(g + 'T12:00:00Z'));
+    const d = new Date(g + 'T12:00:00Z');
+    const s = new Intl.DateTimeFormat(info(lingua).locale, { weekday: forma || 'long', timeZone: 'UTC' }).format(d);
+    return senzaPunjabi(lingua, s) ? (forma === 'short' ? PA_C : PA_G)[d.getUTCDay()] : s;
   }
   function dataLunga(lingua, g) {
-    return new Intl.DateTimeFormat(info(lingua).locale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(g + 'T12:00:00Z'));
+    const d = new Date(g + 'T12:00:00Z');
+    const s = new Intl.DateTimeFormat(info(lingua).locale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(d);
+    return senzaPunjabi(lingua, s) ? `${PA_G[d.getUTCDay()]}, ${d.getUTCDate()} ${PA_M[d.getUTCMonth()]}` : s;
   }
   return { ELENCO, NAZIONI, daNazione, info, delTelefono, t, giorno, dataLunga, testi: T };
 })();

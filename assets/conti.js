@@ -169,7 +169,8 @@ const Conti = (() => {
       if (fine <= inizio) fine = new Date(fine.getTime() + 864e5);        // turno di notte
       return { inizio, fine, durata: Math.round((fine - inizio) / 60000) };
     });
-    return lista.sort((a, b) => Math.abs(a.inizio - e) - Math.abs(b.inizio - e))[0] || null;
+    // solo i pezzi non ancora finiti all'entrata (controllo 19/11/2026, 87): se non ce n'è, vale l'orario della persona
+    return lista.filter(x => x.fine > e).sort((a, b) => Math.abs(a.inizio - e) - Math.abs(b.inizio - e))[0] || null;
   }
   /* I minuti oltre il turno di un'uscita (o di adesso, se è ancora dentro):
      null se non c'è l'entrata. Con un turno segnato: i minuti dopo la sua

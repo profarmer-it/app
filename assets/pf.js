@@ -1064,7 +1064,7 @@ const PF = (() => {
     const manca = righe.filter(r => r.paga == null);
     return `<div class="cruscotto">
         <div class="cifra"><span>Ore lavorate</span><b>${Conti.hhmm(ore)}</b></div>
-        <div class="cifra forte"><span>Netto guadagnato</span><b>${euro(tot('netto'))}</b></div>
+        <div class="cifra forte"><span>Netto da pagare</span><b>${euro(tot('netto'))}</b></div>
         <div class="cifra"><span>Riposi</span><b>${tot('dichiarati') + tot('senza')}</b><small>${tot('dichiarati')} dichiarat${tot('dichiarati') === 1 ? 'o' : 'i'} · ${tot('senza')} senza timbrature</small></div>
       </div>
       <div class="scheda scorre"><table class="tab-tabella">
@@ -1078,7 +1078,7 @@ const PF = (() => {
       </table></div>
       ${manca.length ? `<p class="sotto">Manca la paga oraria di ${manca.map(r => esc(r.f.persona.nome)).join(', ')}: la metti nella sua scheda (Altro → Persone) o con «metti».</p>` : ''}
       <p class="sotto">Netto = ore lavorate del mese × paga oraria netta, straordinari compresi alla stessa paga. Riposi: dichiarati + senza timbrature. «Senza timbrature» sono i giorni passati
-        in cui non ha timbrato e non aveva ferie, riposo o malattia. Lo vedi solo tu: ai dipendenti la paga non arriva.</p>
+        in cui non ha timbrato e non aveva ferie, riposo o malattia. Questa pagina la vedi solo tu: i dipendenti non vedono la paga.</p>
       <h2 class="sezione">Ore, straordinari e assenze</h2>`;
   }
   function foglioPaga(pid) {
@@ -1116,7 +1116,7 @@ const PF = (() => {
     const chieste = A.assenze.filter(x => x.stato === 'chiesta');
     return `<div class="navsett"><button data-az="mese" data-n="-1" aria-label="Mese prima">‹</button>
         <b>${MESI[m - 1]} ${a}</b><button data-az="mese" data-n="1" aria-label="Mese dopo"${mese >= Conti.oggi().slice(0, 7) ? ' disabled style="opacity:.4"' : ''}>›</button></div>
-      ${chieste.length ? `<a class="avviso" href="#ferie" style="display:block;text-decoration:none;color:inherit">${chieste.length === 1 ? 'Una richiesta' : chieste.length + ' richieste'} di ferie o riposo da decidere: aprile in <b>Ferie</b>.</a>` : ''}
+      ${chieste.length ? `<a class="avviso" href="#ferie" style="display:block;text-decoration:none;color:inherit">${chieste.length === 1 ? 'Una richiesta' : chieste.length + ' richieste'} di ferie o riposo da decidere: le trovi in <b>Ferie</b>.</a>` : ''}
       <div id="mese-dati"><p class="lista-vuota">Conto le ore…</p></div>`;
   }
   function dettaglio(f) {
@@ -1322,7 +1322,7 @@ const PF = (() => {
       <div class="scheda"><div class="riga"><span>Pausa</span><span class="dx">${A.azienda.pausa_minuti ? `${A.azienda.pausa_minuti} min oltre ${A.azienda.pausa_dopo_ore} ore` : 'nessuna'}</span></div>
         <div class="riga"><span>Promemoria a chi non timbra</span><span class="dx">${A.azienda.ritardo_minuti} min dopo l’inizio del turno</span></div>
         <div class="riga"><span>Avviso straordinari</span><span class="dx">oltre ${A.azienda.soglia_straordinari_mese} ore al mese</span></div>
-        <div class="riga"><span>Controllo quando si timbra dal telefono</span><span class="dx">${{ posizione: 'posizione al momento', nessuna: 'nessuno' }[A.azienda.verifica] || 'posizione al momento'}${A.azienda.verifica === 'posizione' ? (A.azienda.area ? `, ${A.azienda.raggio_m} m` : ' · <b style="color:var(--rosso)">area da segnare</b>') : ''}</span></div>
+        <div class="riga"><span>Controllo quando si timbra dal telefono</span><span class="dx">${{ posizione: 'registra la posizione di quel momento', nessuna: 'nessuno' }[A.azienda.verifica] || 'registra la posizione di quel momento'}</span></div>
         <button class="btn sec pieno" style="margin-top:10px" data-az="regole">Cambia le regole</button></div>
       <h2 class="sezione">Documenti</h2>
       <div class="scheda">
@@ -1786,7 +1786,7 @@ const PF = (() => {
     PFDemo.diventa(v); location.hash = ''; carica();
   });
   document.addEventListener('click', ev => {
-    if (ev.target.id === 'demo-ricomincia') { PFDemo.ricomincia(); PFDemo.diventa('p-marco'); location.hash = ''; carica(); }
+    if (ev.target.id === 'demo-ricomincia') { PFDemo.ricomincia(); location.hash = ''; location.reload(); }   // controllo 19/11/2026
   });
 
   // i link «#collega=» del telefono senza e-mail non valgono più (30/10/2026)
