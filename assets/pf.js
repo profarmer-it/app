@@ -418,6 +418,8 @@ const PF = (() => {
     rpc('pf_mia_richiesta').then(r => {
       emailAccesso = r.email || emailAccesso;
       const q = r.richiesta;
+      // un'azienda ha invitato questa e-mail: si entra solo accettando (92, 20/11/2026)
+      if (!r.persona && (r.inviti || []).length) return schermoInviti(r.inviti);
       if (r.persona) return schermo('Accesso sospeso', `<p class="sotto">${esc(msg || 'Presenze e turni non è attiva per la tua azienda in questo momento. Scrivi a info@profarmer.it.')}</p>`);
       if (q && q.stato === 'in_attesa') {
         // «Ho ricevuto l'e-mail: entra» premuto prima dell'abilitazione: lo si dice (3/11/2026)
@@ -438,6 +440,33 @@ const PF = (() => {
     app().innerHTML = `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
       <p class="sotto chi-sono">Sei entrato come <b>${esc(emailAccesso).replace('@', '@<wbr>')}</b><br><a href="#" data-az="esci">Esci e cambia account</a></p>
       <h1>${esc(titolo)}</h1>${corpo}</div>`;
+  }
+  /* Gli inviti e la scelta dell'azienda (92, 20/11/2026). Una persona entra in
+     un'azienda solo accettando il suo invito, col nome dell'azienda davanti;
+     chi è in più aziende sceglie dove lavora adesso (Profilo → «Cambia azienda»). */
+  const K_INVITI_DOPO = 'pf-inviti-dopo';
+  const invitiDopo = () => { try { return sessionStorage.getItem(K_INVITI_DOPO) === '1'; } catch (e) { return false; } };
+  function schermoAccesso(titolo, corpo) {
+    fermaOrologio();
+    app().className = '';
+    app().innerHTML = barraDemo() + `<div class="accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
+      <p class="sotto chi-sono">${L('Sei entrato come')} <b>${esc(emailAccesso || (A && A.io && A.io.email) || '').replace('@', '@<wbr>')}</b><br><a href="#" data-az="esci">${L('Esci e cambia account')}</a></p>
+      <h1>${esc(titolo)}</h1>${corpo}</div>`;
+  }
+  function schermoInviti(inviti, giaDentro) {
+    schermoAccesso(inviti.length > 1 ? L('Ti hanno invitato su Easy') : L('{azienda} ti ha invitato su Easy', { azienda: inviti[0].ragione }),
+      `<p class="sotto">${L('Entra solo se lavori davvero in questa azienda: vedrà le tue timbrature.')}</p>
+      ${inviti.map(i => `<div class="scheda"><p style="margin:0 0 4px"><b>${esc(i.ragione)}</b>${i.comune ? ` · ${esc(i.comune)}` : ''}</p>
+        <p class="sotto" style="margin:0 0 10px">${i.ruolo === 'titolare' ? L('Come titolare') : L('Come dipendente')}${i.da ? ' · ' + L('invito di {nome}', { nome: esc(i.da) }) : ''}</p>
+        <button class="btn pieno" data-az="accetta-invito" data-id="${esc(i.id)}">${L('Entra in {azienda}', { azienda: esc(i.ragione) })}</button>
+        <button class="btn sec pieno" style="margin-top:8px" data-az="rifiuta-invito" data-id="${esc(i.id)}" data-ragione="${esc(i.ragione)}">${L('Non è la mia azienda')}</button></div>`).join('')}
+      ${giaDentro ? `<button class="btn chiaro pieno" data-az="inviti-dopo">${L('Decido dopo')}</button>` : ''}`);
+  }
+  function schermoScegli() {
+    schermoAccesso(L('In che azienda lavori adesso?'),
+      `<p class="sotto">${L('Sei dentro più aziende. Le timbrature vanno all’azienda che scegli; la cambi quando vuoi dal Profilo.')}</p>
+      ${A.mie.aziende.map(z => `<button class="btn${z.id === A.mie.attuale ? '' : ' sec'} pieno" style="margin-top:8px" data-az="scegli-azienda" data-id="${esc(z.id)}">
+        ${esc(z.ragione)}${z.comune ? ` · ${esc(z.comune)}` : ''}</button>`).join('')}`);
   }
   function formRichiesta(rifiutata, msg) {
     const v = formRichiesta.valori || {};
@@ -481,12 +510,14 @@ const PF = (() => {
 
   /* -------------------------------------------------------------- caricare */
   function carica(dopo) {
-    return rpc('pf_area').then(r => {
+    // le aziende di chi entra e gli inviti aperti (92, 20/11/2026); se non risponde si va avanti
+    return Promise.all([rpc('pf_area'), rpc('pf_mie_aziende').catch(() => null)]).then(([r, mie]) => {
       if (!r || !r.ok) {
         if (DEMO) return mostraAccesso('Il tuo accesso all’app Pro Farmer non è attivo.');
         return richiesta();
       }
       A = r;
+      A.mie = mie || { aziende: [], inviti: [], scelta: true };
       // il titolare vede l'app in italiano; il dipendente nella sua lingua
       if (linguaScelta && A.io.ruolo !== 'titolare' && LINGUA !== A.io.lingua) {
         A.io.lingua = LINGUA; rpc('pf_salva_lingua', { p_lingua: LINGUA }).catch(() => {});
@@ -495,6 +526,9 @@ const PF = (() => {
       impostaLingua(A.io.ruolo === 'titolare' ? 'it' : (A.io.lingua || leggi('pf-lingua', null) || 'it'), A.io.ruolo !== 'titolare');
       if (A.persone && !A.persone.find(p => p.id === A.io.id)) A.persone.push(A.io);
       svuotaCoda();
+      // in più aziende e non ancora scelta: si sceglie; un invito nuovo: si decide (o «Decido dopo»)
+      if (A.mie.aziende.length > 1 && !A.mie.scelta) return schermoScegli();
+      if (A.mie.inviti.length && !invitiDopo()) return schermoInviti(A.mie.inviti, true);
       if (dopo) dopo(); else disegna();
     }).catch(e => {
       // senza rete: se l'area c'era già, si continua con quella
@@ -685,7 +719,7 @@ const PF = (() => {
     const dentro = Conti.dentro(A.timbrature, A.io.id);
     const turni = Conti.turniDelGiorno(A.turni, A.io.id, oggi);
     const u = ultimaMia();
-    const coda = leggi(K_CODA, []).filter(c => c.tipo === 'io');
+    const coda = leggi(K_CODA, []).filter(c => c.tipo === 'io' && miaInCoda(c));
     const verifica = A.azienda.verifica;
     const f = Conti.foglio(A.io, A.timbrature, A.assenze, A.azienda, oggi.slice(0, 7));
     const a = assenzaDel(A.io.id, oggi);
@@ -752,17 +786,23 @@ const PF = (() => {
   }
 
   /* ------------------------------------------------- la coda senza rete */
-  function metti(c) { const q = leggi(K_CODA, []); q.push({ ...c, messa: new Date().toISOString() }); scrivi(K_CODA, q); }
+  /* Ogni timbratura in coda ricorda la persona (e quindi l'azienda) che l'ha fatta
+     (20/11/2026): se sullo stesso telefono entra un altro, o la persona passa a
+     un'altra azienda, la timbratura aspetta e non finisce nell'azienda sbagliata. */
+  const miaInCoda = c => !c.persona || !!(A && A.io && c.persona === A.io.id);
+  function metti(c) { const q = leggi(K_CODA, []); q.push({ ...c, persona: A && A.io ? A.io.id : null, messa: new Date().toISOString() }); scrivi(K_CODA, q); }
   let svuoto = false;
   function svuotaCoda() {
     const q = leggi(K_CODA, []);
-    if (!q.length || svuoto || navigator.onLine === false) return Promise.resolve();
+    if (!A || !q.length || svuoto || navigator.onLine === false) return Promise.resolve();
     svuoto = true;
     const resto = [];
-    return q.reduce((p, c) => p.then(() => rpc('pf_timbra_io', c.args)
+    let partite = 0;
+    return q.reduce((p, c) => p.then(() => !miaInCoda(c) ? resto.push(c) : rpc('pf_timbra_io', c.args).then(() => { partite++; })
       .catch(e => { if (!e.delDatabase) resto.push(c); })), Promise.resolve())
-      .then(() => { scrivi(K_CODA, (resto.length ? resto : null)); svuoto = false; if (resto.length < q.length && A) aggiorna(`Partite le timbrature salvate (${q.length - resto.length}).`); });
+      .then(() => { scrivi(K_CODA, (resto.length ? resto : null)); svuoto = false; if (partite && A) aggiorna(`Partite le timbrature salvate (${partite}).`); });
   }
+  const codaMia = () => leggi(K_CODA, []).filter(miaInCoda).length;
   window.addEventListener('online', () => svuotaCoda());
   setInterval(() => svuotaCoda(), 60000);
 
@@ -1311,7 +1351,7 @@ const PF = (() => {
       <h2 class="sezione">Persone</h2>
       <div class="scheda">${persone.map(p => `<button class="persona" style="width:100%;text-align:left" data-az="persona" data-id="${p.id}">
         <span class="avatar">${iniziale(p)}</span><span class="chi"><b>${esc(nome(p))}${p.attivo === false ? ' · non più attivo' : ''}</b>
-        <span>${p.ruolo === 'titolare' ? 'Titolare' : 'Dipendente'} · ${p.ore_giorno} ore al giorno${p.email ? (p.invitato ? ' · accesso mandato' : ' · accesso da mandare') : ' · senza e-mail'}</span></span></button>`).join('')}
+        <span>${p.ruolo === 'titolare' ? 'Titolare' : 'Dipendente'} · ${p.ore_giorno} ore al giorno${!p.email ? ' · senza e-mail' : p.legato ? ' · è entrato' : p.rifiutato ? ' · <span style="color:var(--arancio)">ha detto che non è la sua azienda: controlla l’e-mail</span>' : p.invitato ? ' · accesso mandato, deve ancora entrare' : ' · accesso da mandare'}</span></span></button>`).join('')}
         <button class="btn sec pieno" style="margin-top:10px" data-az="persona">+ Aggiungi una persona</button></div>
       <h2 class="sezione">Mansionario</h2>
       <div class="scheda">${A.mansioni.map(m => `<button class="riga" style="width:100%;text-align:left" data-az="mansione" data-id="${m.id}">
@@ -1515,6 +1555,9 @@ const PF = (() => {
     return `<h2 class="sezione">${L('Il tuo profilo')}</h2>
       <div class="scheda"><div class="riga"><span>${esc(nome(A.io))}</span><span class="dx">${A.io.ruolo === 'titolare' ? L('Titolare') : L('Dipendente')}</span></div>
         <div class="riga"><span>${L('Azienda')}</span><span class="dx">${esc(A.azienda.ragione)}</span></div>
+        ${(A.mie && A.mie.aziende.length > 1) || (A.mie && A.mie.inviti.length) ? `<div class="riga-bottoni" style="margin:8px 0">
+          ${A.mie.aziende.length > 1 ? `<button class="btn sec" data-az="cambia-azienda">${L('Cambia azienda')}</button>` : ''}
+          ${A.mie.inviti.length ? `<button class="btn sec" data-az="vedi-inviti">${L('Inviti da decidere: {n}', { n: A.mie.inviti.length })}</button>` : ''}</div>` : ''}
         ${A.io.email ? `<div class="riga"><span>${L('E-mail')}</span><span class="dx">${esc(A.io.email)}</span></div>` : ''}
         ${titolare() ? '' : `<div class="riga"><label for="lingua-profilo">${L('Lingua')}</label><span class="dx">${sceltaLingua('lingua-profilo')}</span></div>`}
         <div class="riga"><span>${L('Avvisi su questo telefono')}</span><span class="dx" id="stato-avvisi">…</span></div>
@@ -1716,6 +1759,29 @@ const PF = (() => {
     'doc-informativa': () => documento(Documenti.informativa(A.azienda), 'Informativa per i dipendenti'),
     'doc-condizioni': ev => { if (ev && ev.preventDefault) ev.preventDefault(); documento(Documenti.condizioni(), 'Condizioni d’uso di Easy'); },
     ricarica: () => carica(),
+    'accetta-invito': b => {
+      b.disabled = true;
+      rpc('pf_accetta_invito', { p_persona: b.dataset.id }).then(() => { try { sessionStorage.removeItem(K_INVITI_DOPO); } catch (e) {} location.hash = ''; return carica(); })
+        .catch(e => { b.disabled = false; toast(motivo(e)); });
+    },
+    'rifiuta-invito': b => {
+      if (!confirm(L('Non entri in {azienda}: avvisiamo il titolare che l’invito non è per te. Va bene?', { azienda: b.dataset.ragione }))) return;
+      b.disabled = true;
+      rpc('pf_rifiuta_invito', { p_persona: b.dataset.id }).then(() => (A ? carica() : richiesta()))
+        .catch(e => { b.disabled = false; toast(motivo(e)); });
+    },
+    'inviti-dopo': () => { try { sessionStorage.setItem(K_INVITI_DOPO, '1'); } catch (e) {} disegna(); },
+    'vedi-inviti': () => schermoInviti(A.mie.inviti, true),
+    'cambia-azienda': () => {
+      // le timbrature salvate senza rete partono prima, nell'azienda dove sono state fatte
+      if (codaMia()) return toast(L('Prima devono partire le timbrature salvate sul telefono: aspetta che torni la rete.'));
+      schermoScegli();
+    },
+    'scegli-azienda': b => {
+      b.disabled = true;
+      rpc('pf_scegli_azienda', { p_azienda: b.dataset.id }).then(() => { location.hash = ''; return carica(); })
+        .catch(e => { b.disabled = false; toast(motivo(e)); });
+    },
     'stampa-doc': () => stampaDoc(documento.ultimo || ''),
     'accetta-nomina': b => {
       const ok = document.getElementById('nomina-ok');

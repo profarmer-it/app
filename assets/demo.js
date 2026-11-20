@@ -166,7 +166,7 @@ const PFDemo = (() => {
       const tit = me().ruolo === 'titolare';
       const pubblica = p => ({ id: p.id, nome: p.nome, cognome: p.cognome, ruolo: p.ruolo, lingua: p.lingua || 'it',
         ...(tit ? { nazionalita: p.nazionalita || '' } : {}),
-        ...(tit ? { email: p.email, ore_giorno: p.ore_giorno, attivo: p.attivo, invitato: p.invitato, dal: p.dal, al: p.al } : {}) });
+        ...(tit ? { email: p.email, ore_giorno: p.ore_giorno, attivo: p.attivo, invitato: p.invitato, legato: p.invitato, dal: p.dal, al: p.al } : {}) });
       return {
         ok: true, attiva: true, demo: true,
         io: { ...pubblica(me()), email: me().email, ore_giorno: me().ore_giorno },
@@ -328,6 +328,8 @@ const PFDemo = (() => {
       salva(); return { ok: true };
     },
     pf_salva_iscrizione() { return { ok: true }; },
+    // 92 (20/11/2026): nella demo si è sempre in un'azienda sola, senza inviti
+    pf_mie_aziende() { return { attuale: 'demo', scelta: true, aziende: [{ id: 'demo', ragione: d.azienda.ragione }], inviti: [] }; },
     pf_salva_lingua({ p_lingua }) { me().lingua = p_lingua; salva(); return { ok: true }; },
     pf_togli_iscrizione() { return { ok: true }; }
   };
