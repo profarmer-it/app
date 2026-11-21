@@ -183,7 +183,9 @@ const PF = (() => {
   // Prima del codice: ha già un account con una password? (se il controllo non risponde, si va avanti)
   function giaRegistrata(e) {
     if (DEMO) return Promise.resolve(false);
-    return collegamento().functions.invoke('pf-controlla-email', { body: { email: e } })
+    // dal 21/11/2026 con il gettone anti-robot (uno nuovo: quello dell'invio del codice è un altro)
+    return Antirobot.token().catch(() => '')
+      .then(antirobot => collegamento().functions.invoke('pf-controlla-email', { body: { email: e, antirobot } }))
       .then(({ data }) => data && data.ok ? data.stato : 'libera', () => 'libera');
   }
   function mostraPrimo(msg, modo, scritta) {
