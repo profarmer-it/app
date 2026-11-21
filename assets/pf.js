@@ -107,71 +107,91 @@ const PF = (() => {
     : navigator.onLine === false ? L('Sei senza rete: riprova quando torna il segnale.') : L('Qualcosa non è andato: riprova tra poco.');
 
   /* -------------------------------------------------------------- l'accesso
-     Dal 30/10/2026 si entra con e-mail e password, e il telefono la ricorda.
-     Il codice di 6 cifre per e-mail resta per il primo accesso e per la
-     password dimenticata: dopo il codice si sceglie la password. */
-  function mostraAccesso(msg, info) {
-    fermaOrologio(); ridisegnaAccesso = () => mostraAccesso();
+     Porta unica dal 21/11/2026 (scelta di Giulio: prima c'erano «Entra»,
+     «Primo accesso» e «Crea l'account», e chi arrivava non sapeva quale
+     toccare). Si scrive solo l'e-mail e «Avanti»; l'app chiede a
+     pf-controlla-email se ha già una password:
+       - sì → si scrive la password (con «Password dimenticata?»);
+       - no (invitato dal titolare, o nuovo) → codice di 6 cifre, poi la password;
+         dopo l'accesso l'app mostra l'invito (92) o il modulo per chiedere Easy.
+     Se il controllo non risponde si manda il codice: chi aveva già una password,
+     dopo il codice, può «Tenere la password di prima». */
+  function mostraAccesso(msg, info, scritta) {
+    fermaOrologio(); ridisegnaAccesso = () => mostraAccesso(null, null, (document.getElementById('email') || {}).value);
     app().className = '';
     app().innerHTML = `<div class="accesso">
       <div class="testa-accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">${sceltaLingua('lingua-accesso')}</div>
       <h1>${L('Entra nell’app Pro Farmer')}</h1>
+      <p class="sotto">${L('Scrivi la tua e-mail e tocca «Avanti». Se è la prima volta, ti mandiamo un codice di 6 cifre.')}</p>
       <form id="f-email" class="campo" novalidate>
         <label for="email">${L('La tua e-mail')}</label>
-        <input id="email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" value="${esc(emailAccesso)}">
-        <label for="password" style="margin-top:8px">${L('La password')}</label>
+        <input id="email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" value="${esc(scritta != null ? scritta : emailAccesso)}">
+        <div class="antirobot" data-antirobot aria-live="polite"></div>
+        <button class="btn pieno" style="margin-top:8px">${L('Avanti')}</button>
+      </form>
+      ${msg ? `<p class="errore" role="alert">${esc(msg)}</p>` : ''}
+      ${info ? `<p class="sotto" role="status">${esc(info)}</p>` : ''}
+      <p class="sotto">${L('Se sei un dipendente, l’accesso te lo manda il tuo titolare.')}</p>
+      <p class="sotto"><a href="?demo">Guarda la demo</a></p>
+    </div>`;
+    document.getElementById('f-email').addEventListener('submit', ev => {
+      ev.preventDefault();
+      const scritto = document.getElementById('email').value;
+      const e = scritto.trim().toLowerCase();
+      if (!emailValida(e)) return mostraAccesso(L('Scrivi un’e-mail completa, per esempio nome@libero.it.'), null, scritto);
+      emailAccesso = e;
+      const b = ev.currentTarget.querySelector('.btn');
+      b.style.pointerEvents = 'none'; b.textContent = L('Controllo…');
+      giaRegistrata(e).then(stato => {
+        if (stato === 'gia') return mostraEntra();
+        if (stato === 'troppi') return mostraAccesso(L('Troppi tentativi: aspetta 15 minuti e riprova.'), null, scritto);
+        chiediCodice(e, b, true, m => mostraAccesso(m, null, scritto), 'primo');
+      });
+    });
+  }
+  // L'e-mail ha già una password: la si scrive, o «Password dimenticata?» manda il codice.
+  function mostraEntra(msg) {
+    fermaOrologio(); ridisegnaAccesso = () => mostraEntra();
+    app().className = '';
+    app().innerHTML = `<div class="accesso">
+      <div class="testa-accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">${sceltaLingua('lingua-accesso')}</div>
+      <h1>${L('Entra nell’app Pro Farmer')}</h1>
+      <p class="sotto"><b>${esc(emailAccesso).replace('@', '@<wbr>')}</b> · <a href="#" id="altra-email">${L('Ho sbagliato e-mail')}</a></p>
+      <form id="f-entra" class="campo" novalidate>
+        <input type="email" name="email" autocomplete="username" value="${esc(emailAccesso)}" hidden>
+        <label for="password">${L('La password')}</label>
         <div class="campo-pw"><input id="password" name="password" type="password" autocomplete="current-password" enterkeyhint="go">
           <button type="button" class="mostra-pw" aria-label="${L('Mostra')}" aria-pressed="false">${L('Mostra')}</button></div>
         <div class="antirobot" data-antirobot aria-live="polite"></div>
         <button class="btn pieno" style="margin-top:8px">${L('Entra')}</button>
       </form>
       ${msg ? `<p class="errore" role="alert">${esc(msg)}</p>` : ''}
-      ${info ? `<p class="sotto" role="status">${esc(info)}</p>` : ''}
-      <button class="btn sec pieno" id="col-codice" type="button">${L('Primo accesso')}</button>
-      <p class="sotto" style="text-align:center;margin-top:-4px"><a href="#" id="pw-persa">${L('Password dimenticata?')}</a></p>
-      ${LINGUA !== 'it' ? `<p class="sotto">${L('Se sei un dipendente, l’accesso te lo manda il tuo titolare.')}</p>` : ''}
-      <div class="scheda"><b>Non hai ancora un account?</b>
-        <p class="sotto" style="margin:4px 0 10px">Easy è gratuita per i clienti piùLact: crei l'account, chiedi l'attivazione e Pro Farmer ti abilita.
-          Se sei un dipendente, l'accesso te lo manda il tuo titolare.</p>
-        <button class="btn sec pieno" id="crea">Crea l'account</button></div>
-      <p class="sotto"><a href="?demo">Guarda la demo</a></p>
+      <p class="sotto" style="text-align:center"><a href="#" id="pw-persa">${L('Password dimenticata?')}</a></p>
     </div>`;
     occhio();
-    const leggiEmail = () => {
-      const e = document.getElementById('email').value.trim().toLowerCase();
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) { mostraAccesso(L('Scrivi un’e-mail completa, per esempio nome@libero.it.')); return null; }
-      return (emailAccesso = e);
-    };
-    document.getElementById('crea').addEventListener('click', () => mostraCrea());
-    const primo = modo => ev => {
+    const p = document.getElementById('password'); p.focus();
+    document.getElementById('altra-email').addEventListener('click', ev => { ev.preventDefault(); mostraAccesso(); });
+    document.getElementById('pw-persa').addEventListener('click', ev => {
       ev.preventDefault();
-      const e = document.getElementById('email').value.trim().toLowerCase();
-      if (e) emailAccesso = e;
-      mostraPrimo(null, modo);
-    };
-    document.getElementById('col-codice').addEventListener('click', primo('primo'));
-    document.getElementById('pw-persa').addEventListener('click', primo('pw'));
-    document.getElementById('f-email').addEventListener('submit', ev => {
+      const a = ev.currentTarget; a.style.pointerEvents = 'none'; a.textContent = L('Mando il codice…');
+      chiediCodice(emailAccesso, null, false, m => mostraEntra(m), 'pw');
+    });
+    document.getElementById('f-entra').addEventListener('submit', ev => {
       ev.preventDefault();
-      const e = leggiEmail(); if (!e) return;
-      const pw = document.getElementById('password').value;
-      if (!pw) return mostraAccesso(L('Scrivi la password. Se non l’hai ancora scelta, tocca «Primo accesso».'));
+      const e = emailAccesso, pw = p.value;
+      if (!pw) return mostraEntra(L('Scrivi la password.'));
       const b = ev.currentTarget.querySelector('.btn'); b.disabled = true; b.textContent = L('Controllo…');
       Antirobot.token().then(captchaToken => collegamento().auth.signInWithPassword({ email: e, password: pw, options: { captchaToken } })).then(({ error }) => {
         if (!error) { scrivi(K_ATTESA, null); return carica(); }
         const m = String(error.message || '');
-        if (Antirobot.errore(error)) return mostraAccesso(L('Il controllo anti-robot non è riuscito: ricarica la pagina e riprova.'));
-        if (error.status === 429 || /rate|too many/i.test(m)) return mostraAccesso(L('Troppi tentativi: aspetta qualche minuto e riprova.'));
-        if (/invalid|credentials/i.test(m)) return mostraAccesso(L('E-mail o password sbagliate. Se non ricordi la password, tocca «Password dimenticata?». Se non l’hai mai scelta, tocca «Primo accesso».'));
-        mostraAccesso(noRete());
-      }).catch(() => mostraAccesso(noRete()));
+        if (Antirobot.errore(error)) return mostraEntra(L('Il controllo anti-robot non è riuscito: ricarica la pagina e riprova.'));
+        if (error.status === 429 || /rate|too many/i.test(m)) return mostraEntra(L('Troppi tentativi: aspetta qualche minuto e riprova.'));
+        if (/invalid|credentials/i.test(m)) return mostraEntra(L('Password sbagliata. Se non la ricordi, tocca «Password dimenticata?».'));
+        mostraEntra(noRete());
+      }).catch(() => mostraEntra(noRete()));
     });
   }
-  /* Primo accesso o password dimenticata (separati dal 3/11/2026): e-mail,
-     codice, password. Nel primo accesso, prima del codice, si controlla se
-     l'e-mail ha già un account con una password (pf-controlla-email, richiesta
-     di Giulio): se sì, si dice di entrare o di usare «Password dimenticata?».
-     Ci porta anche il link dell'e-mail d'invito (#primo-accesso).
+  /* Il codice e la password (dal 3/11/2026; dal 21/11 dietro la porta unica).
      Collaudo del 3/11/2026 (App Pro Farmer/collaudo-accesso/): il codice atteso
      resta sul telefono 15 minuti (se la pagina si ricarica mentre si legge
      l'e-mail si riparte dal codice), «Mandami un altro codice», «Ho sbagliato
@@ -188,100 +208,12 @@ const PF = (() => {
       .then(antirobot => collegamento().functions.invoke('pf-controlla-email', { body: { email: e, antirobot } }))
       .then(({ data }) => data && data.ok ? data.stato : 'libera', () => 'libera');
   }
-  function mostraPrimo(msg, modo, scritta) {
-    const pw = modo === 'pw';
-    fermaOrologio(); ridisegnaAccesso = () => mostraPrimo(null, modo, (document.getElementById('p-email') || {}).value);
-    app().className = '';
-    app().innerHTML = `<div class="accesso">
-      <div class="testa-accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">${sceltaLingua('lingua-accesso')}</div>
-      <h1>${pw ? L('Password dimenticata?') : L('Primo accesso')}</h1>
-      <p class="sotto">${pw ? L('Ti mandiamo un codice per e-mail, poi scegli una password nuova.') : L('Si fa una volta sola, in tre passi.')}</p>
-      ${pw ? '' : `<ol class="passi">
-        <li>${L('Scrivi la tua e-mail, quella a cui è arrivato l’invito.')}</li>
-        <li>${L('Ti mandiamo un codice di 6 cifre: scrivilo qui.')}</li>
-        <li>${L('Scegli la tua password. Dalla volta dopo entri con e-mail e password.')}</li>
-      </ol>`}
-      <form id="f-primo" class="campo" novalidate>
-        <label for="p-email">${L('La tua e-mail')}</label>
-        <input id="p-email" type="email" inputmode="email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" value="${esc(scritta != null ? scritta : emailAccesso)}">
-        <div class="antirobot" data-antirobot aria-live="polite"></div>
-        <button class="btn pieno" style="margin-top:8px">${L('Mandami il codice')}</button>
-      </form>
-      ${msg ? `<p class="errore" role="alert">${esc(msg)}</p>` : ''}
-      <p class="sotto"><a href="#" id="torna">${L('← Ho già la password: entra')}</a></p>
-    </div>`;
-    document.getElementById('torna').addEventListener('click', ev => { ev.preventDefault(); history.replaceState(null, '', location.pathname + location.search); mostraAccesso(); });
-    document.getElementById('f-primo').addEventListener('submit', ev => {
-      ev.preventDefault();
-      const scritto = document.getElementById('p-email').value;
-      const e = scritto.trim().toLowerCase();
-      if (!emailValida(e)) return mostraPrimo(L('Scrivi un’e-mail completa, per esempio nome@libero.it.'), modo, scritto);
-      emailAccesso = e;
-      const b = ev.currentTarget.querySelector('.btn');
-      const torna = m => mostraPrimo(m, modo);
-      if (pw) return chiediCodice(e, b, false, torna, modo);
-      b.style.pointerEvents = 'none'; b.textContent = L('Controllo…');
-      // senza anti-robot, per non chiedere due volte la casella: frenano i limiti per IP ed e-mail (50-controllo-email.sql)
-      giaRegistrata(e).then(stato => {
-        if (stato === 'gia') return mostraGia();
-        if (stato === 'troppi') return torna(L('Troppi tentativi: aspetta 15 minuti e riprova.'));
-        chiediCodice(e, b, false, torna, modo);
-      });
-    });
-  }
-  // L'e-mail ha già un account (3/11/2026): si entra con la password o la si reimposta.
-  function mostraGia() {
-    ridisegnaAccesso = () => mostraGia();
-    app().className = '';
-    app().innerHTML = `<div class="accesso">
-      <div class="testa-accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">${sceltaLingua('lingua-accesso')}</div>
-      <h1>${L('Hai già un account')}</h1>
-      <div class="avviso" role="alert">${L('L’indirizzo {email} è già associato a un account.', { email: `<b>${esc(emailAccesso)}</b>` })}</div>
-      <p class="sotto">${L('Entra con la tua e-mail e la tua password. Se non ricordi la password, tocca «Password dimenticata?» e la reimposti con un codice per e-mail.')}</p>
-      <button class="btn pieno" id="gia-entra">${L('Entra')}</button>
-      <button class="btn sec pieno" id="gia-pw">${L('Password dimenticata?')}</button>
-    </div>`;
-    document.getElementById('gia-entra').addEventListener('click', () => { history.replaceState(null, '', location.pathname + location.search); mostraAccesso(); });
-    document.getElementById('gia-pw').addEventListener('click', () => mostraPrimo(null, 'pw'));
-  }
-  // Crea l'account (il titolare, in italiano): e-mail, codice, password; poi la richiesta a Pro Farmer.
-  function mostraCrea(msg, scritta) {
-    fermaOrologio(); ridisegnaAccesso = () => mostraCrea();
-    app().className = '';
-    app().innerHTML = `<div class="accesso">
-      <img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">
-      <h1>Crea l'account</h1>
-      <p class="sotto">Scrivi la tua e-mail: ti mandiamo un codice di 6 cifre per confermarla, poi scegli la password.</p>
-      <form id="f-crea" class="campo" novalidate>
-        <label for="c-email">La tua e-mail</label>
-        <input id="c-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" value="${esc(scritta != null ? scritta : emailAccesso)}">
-        <div class="antirobot" data-antirobot aria-live="polite"></div>
-        <button class="btn pieno" style="margin-top:8px">Mandami il codice</button>
-      </form>
-      ${msg ? `<p class="errore" role="alert">${esc(msg)}</p>` : ''}
-      <p class="sotto"><a href="#" id="torna">← Ho già un account</a></p>
-    </div>`;
-    document.getElementById('torna').addEventListener('click', ev => { ev.preventDefault(); mostraAccesso(); });
-    document.getElementById('f-crea').addEventListener('submit', ev => {
-      ev.preventDefault();
-      const scritto = document.getElementById('c-email').value;
-      const e = scritto.trim().toLowerCase();
-      if (!emailValida(e)) return mostraCrea('Scrivi un’e-mail completa, per esempio nome@libero.it.', scritto);
-      emailAccesso = e;
-      const b = ev.currentTarget.querySelector('.btn');
-      b.style.pointerEvents = 'none'; b.textContent = 'Controllo…';
-      giaRegistrata(e).then(stato => {
-        if (stato === 'gia') return mostraGia();
-        if (stato === 'troppi') return mostraCrea('Troppi tentativi: aspetta 15 minuti e riprova.');
-        chiediCodice(e, b, true, m => mostraCrea(m), 'crea');
-      });
-    });
-  }
+  // crea = l'account può nascere qui (porta unica: invitato o nuovo); per «Password dimenticata?» no
   function chiediCodice(e, el, crea, indietro, modo) {
     if (el) { el.style.pointerEvents = 'none'; el.textContent = L('Mando il codice…'); }
-    const torna = indietro || (crea ? mostraCrea : mostraAccesso);
-    // l'e-mail del codice nella lingua della pagina; chi crea l'account (il titolare) la riceve in italiano
-    const lingua = crea ? 'it' : LINGUA;
+    const torna = indietro || mostraAccesso;
+    // l'e-mail del codice nella lingua della pagina
+    const lingua = LINGUA;
     Antirobot.token().then(captchaToken => collegamento().auth.signInWithOtp({ email: e, options: { shouldCreateUser: !!crea, data: crea ? { app: 'pf' } : undefined,
       emailRedirectTo: 'https://easy.profarmer.it/' + (lingua !== 'it' ? '?l=' + lingua : ''), captchaToken } })).then(({ error }) => {
       if (!error) {
@@ -298,7 +230,7 @@ const PF = (() => {
       }
       if (/signup|not allowed|not found|user/i.test(m)) return crea
         ? torna('Le registrazioni non sono ancora aperte: scrivi a info@profarmer.it.')
-        : torna(L('Questa e-mail non ha un account. Se sei un dipendente, chiedi al titolare di mandarti l’accesso; se sei il titolare, torna indietro e tocca «Crea l’account».'));
+        : torna(L('Questa e-mail non ha ancora un account: torna all’accesso e tocca «Avanti».'));
       torna(noRete());
     }).catch(() => torna(noRete()));
   }
@@ -309,7 +241,7 @@ const PF = (() => {
     fermaOrologio();
     app().className = '';
     app().innerHTML = `<div class="accesso">
-      <div class="testa-accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">${a.crea ? '' : sceltaLingua('lingua-accesso')}</div>
+      <div class="testa-accesso"><img class="logo" src="assets/logo-bianco.png" alt="Pro Farmer">${sceltaLingua('lingua-accesso')}</div>
       <h1>${L('Controlla la posta')}</h1>
       <p class="sotto">${L('Ti abbiamo mandato un codice di 6 cifre a {email}. Vale 15 minuti. Se non lo trovi, guarda nella posta indesiderata.', { email: `<b>${esc(a.email)}</b>` })}
         ${L('L’e-mail arriva da Pro Farmer (riposa@profarmer.it).')}</p>
@@ -322,7 +254,7 @@ const PF = (() => {
       <button class="btn sec pieno" id="di-nuovo" type="button">${L('Mandami un altro codice')}</button>
       <p class="sotto"><a href="#" id="altra-email">${L('Ho sbagliato e-mail')}</a> · <a href="#" id="altra">${L('← Torna all’accesso')}</a></p>
     </div>`;
-    const indietro = () => a.crea ? mostraCrea() : mostraPrimo(null, a.modo);
+    const indietro = () => mostraAccesso(null, null, a.email);
     document.getElementById('altra').addEventListener('click', ev => { ev.preventDefault(); scrivi(K_ATTESA, { ...a, sospesa: true }); mostraAccesso(); });
     // il codice resta valido: se si richiede per la stessa e-mail entro un minuto si torna a scriverlo
     document.getElementById('altra-email').addEventListener('click', ev => { ev.preventDefault(); scrivi(K_ATTESA, { ...a, sospesa: true }); indietro(); });
@@ -352,8 +284,8 @@ const PF = (() => {
         // dopo il codice si sceglie la password; chi ne ha già una scelta da lui la può tenere
         collegamento().auth.getUser().then(({ data }) => {
           const gia = !!(data && data.user && data.user.user_metadata && data.user.user_metadata.password_scelta);
-          mostraPassword(() => carica(), gia, null, false, a.crea);
-        }, () => mostraPassword(() => carica(), false, null, false, a.crea));
+          mostraPassword(() => carica(), gia, null, false, false);
+        }, () => mostraPassword(() => carica(), false, null, false, false));
       }).catch(() => mostraCodice(noRete()));
     });
   }
@@ -1867,7 +1799,7 @@ const PF = (() => {
   window.addEventListener('hashchange', () => {
     const h = location.hash;
     if (/#collega=/.test(h)) return collegamentoVecchio();
-    if (h === '#primo-accesso' && !A) return mostraPrimo();
+    if (h === '#primo-accesso' && !A) return mostraAccesso();
     if (A) disegna();
   });
 
@@ -1886,14 +1818,15 @@ const PF = (() => {
           // un link di conferma di un'e-mail vecchia: entra con i suoi gettoni
           history.replaceState(null, '', location.pathname);
           return collegamento().auth.setSession({ access_token: h.get('access_token'), refresh_token: h.get('refresh_token') })
-            .then(({ error }) => error ? mostraAccesso(L('Il link dell’e-mail non vale più: chiedi un codice nuovo con «Primo accesso» o «Password dimenticata?».')) : carica())
+            .then(({ error }) => error ? mostraAccesso(L('Il link dell’e-mail non vale più: scrivi la tua e-mail e tocca «Avanti».')) : carica())
             .catch(() => mostraAccesso(noRete()));
         }
         if (h.get('error') || h.get('error_code')) {
           history.replaceState(null, '', location.pathname);
-          return mostraAccesso(L('Il link dell’e-mail non vale più: chiedi un codice nuovo con «Primo accesso» o «Password dimenticata?».'));
+          return mostraAccesso(L('Il link dell’e-mail non vale più: scrivi la tua e-mail e tocca «Avanti».'));
         }
-        if (location.hash === '#primo-accesso') return mostraPrimo();
+        // il link dell'e-mail d'invito (#primo-accesso) porta alla stessa porta unica (21/11/2026)
+        if (location.hash === '#primo-accesso') { history.replaceState(null, '', location.pathname + location.search); return mostraAccesso(''); }
         return attesa() && !attesa().sospesa ? mostraCodice() : mostraAccesso('');
       }
       if (location.hash === '#primo-accesso') history.replaceState(null, '', location.pathname + location.search);
